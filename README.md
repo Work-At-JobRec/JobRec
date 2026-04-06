@@ -5,6 +5,7 @@ The applicant-focused job board you didn't know you needed
 # Contributors
 - Luna Brown
 - Luke MCCartney
+- Pranav Putta
 
 - Sharvari Deshpande:
 - role: developer
