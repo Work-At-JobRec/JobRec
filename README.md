@@ -6,7 +6,4 @@ The applicant-focused job board you didn't know you needed
 - Luna Brown
 - Luke McCartney
 - Pranav Putta
-
-- Sharvari Deshpande:
-- role: developer
-- likes: spending time with friends, running, watching movies
+- Sharvari Deshpande
