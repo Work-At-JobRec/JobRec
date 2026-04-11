@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JobRec Profile Mockup</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #d9d9d9;
+        color: #111;
+      }
+
+      .page {
+        min-height: 100vh;
+        padding: 0;
+      }
+
+      
+
+      .frame {
+        width: 100%;
+        min-height: 100vh;
+        background: #f4f4f4;
+        margin: 0;
+      }
+
+      .navbar {
+        background: #000;
+        color: #fff;
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr 1fr;
+        align-items: center;
+        padding: 10px 18px;
+        min-height: 58px;
+      }
+
+      .brand,
+      .nav-item {
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .brand {
+        font-size: 30px;
+        justify-self: start;
+      }
+
+      .nav-item {
+        font-size: 28px;
+        justify-self: center;
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: 42% 58%;
+        min-height: calc(100vh - 58px);
+        align-items: stretch;
+      }
+
+      .left,
+      .right {
+        padding: 34px 34px 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .left {
+        border-right: 1px solid #bdbdbd;
+        text-align: center;
+      }
+
+      .section-title {
+        margin: 0 0 24px;
+        font-size: 30px;
+        font-weight: 700;
+      }
+
+      .name,
+      .email,
+      .phone {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .email,
+      .phone {
+        margin-top: 4px;
+      }
+
+      .location {
+        margin-top: 10px;
+        color: #9b9b9b;
+        font-size: 17px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .avatar-wrap {
+        position: relative;
+        width: 132px;
+        height: 132px;
+        margin: 24px auto 22px;
+      }
+
+      .avatar {
+        width: 132px;
+        height: 132px;
+        border-radius: 50%;
+        background: #b1b3b7;
+        position: relative;
+      }
+
+      .avatar::before {
+        content: "";
+        position: absolute;
+        width: 48px;
+        height: 48px;
+        background: #2b323d;
+        border-radius: 50%;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .avatar::after {
+        content: "";
+        position: absolute;
+        width: 84px;
+        height: 38px;
+        background: #2b323d;
+        border-radius: 36px 36px 14px 14px;
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .avatar-add {
+        position: absolute;
+        right: -2px;
+        bottom: 10px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #555;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        line-height: 1;
+        color: #555;
+      }
+
+      .subheading {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 8px 0 18px;
+      }
+
+      .upload-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 260px;
+        border: none;
+        border-radius: 16px;
+        background: #000;
+        color: #fff;
+        font-size: 19px;
+        font-weight: 700;
+        padding: 16px 24px;
+        cursor: pointer;
+      }
+
+      .right {
+        position: relative;
+      }
+
+      .right-title {
+        margin: 0 0 28px;
+        text-align: center;
+        font-size: 26px;
+        font-weight: 700;
+      }
+
+      .menu {
+        margin: 0 auto;
+        max-width: 320px;
+        width: 100%;
+      }
+
+      .menu-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin: 30px 0;
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .plus {
+        width: 22px;
+        height: 22px;
+        border: 1.8px solid #444;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        color: #444;
+        flex-shrink: 0;
+      }
+
+      @media (max-width: 760px) {
+        .navbar {
+          grid-template-columns: 1fr 1fr;
+          gap: 8px 16px;
+          padding: 14px;
+        }
+
+        .brand,
+        .nav-item {
+          font-size: 24px;
+        }
+
+        .brand {
+          grid-column: 1 / -1;
+          justify-self: center;
+        }
+
+        .content {
+          grid-template-columns: 1fr;
+        }
+
+        .left {
+          border-right: none;
+          border-bottom: 1px solid #bdbdbd;
+        }
+
+        .menu {
+          max-width: 360px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="frame">
+        <header class="navbar">
+          <div class="brand">JobRec</div>
+          <div class="nav-item">Jobs</div>
+          <div class="nav-item">Search</div>
+          <div class="nav-item">Profile</div>
+        </header>
+
+        <main class="content">
+          <section class="left">
+            <h1 class="section-title">Your Profile</h1>
+            <p class="name">Jane Smith</p>
+            <p class="email">janesmith100@gmail.com</p>
+            <p class="phone">(+1) 650-890-0093</p>
+            <div class="location">
+              <span>📍</span>
+              <span>West Lafayette, IN</span>
+            </div>
+
+            <div class="avatar-wrap">
+              <div class="avatar"></div>
+              <div class="avatar-add">+</div>
+            </div>
+
+            <div class="subheading">Autofill Profile with Resume:</div>
+            <button class="upload-btn">Upload Resume</button>
+          </section>
+
+          <section class="right">
+            <h2 class="right-title">Or, Manually Add Information:</h2>
+
+            <div class="menu">
+              <div class="menu-item"><span class="plus">+</span><span>Education:</span></div>
+              <div class="menu-item"><span class="plus">+</span><span>Work Experience:</span></div>
+              <div class="menu-item"><span class="plus">+</span><span>Projects:</span></div>
+              <div class="menu-item"><span class="plus">+</span><span>Skills:</span></div>
+              <div class="menu-item"><span class="plus">+</span><span>Socials:</span></div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
