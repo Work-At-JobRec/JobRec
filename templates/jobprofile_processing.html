@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="5" />
     <title>JobRec Profile Mockup</title>
     <style>
       * {
@@ -173,8 +174,8 @@
         min-width: 260px;
         border: none;
         border-radius: 16px;
-        background: #000;
-        color: #fff;
+        background: #3d3d3d;
+        color: #d1d1d1;
         font-size: 19px;
         font-weight: 700;
         padding: 16px 24px;
@@ -280,60 +281,16 @@
               <div class="avatar-add">+</div>
             </div>
 
-            <div class="subheading">Autofill Profile with Resume:</div>
-            <form action="http://127.0.0.1:5000/upload" method="post" enctype="multipart/form-data">
+            <div class="subheading">Analyzing resume...</div>
+            <form>
               <label for="resume" class="upload-btn">Upload resume</label><br><br>
-              <input type="file" id="resume" name="resume" accept=".pdf,.doc,.docx">
-              <input type="submit" value="Submit">
+              <input type="file" disabled="true" id="resume" name="resume" accept=".pdf,.doc,.docx">
               <br><br>
             </form>
           </section>
 
           <section class="right">
-            {% if user_info is defined %}
-            <h2 class="right-title">Your current information:</h2>
-
-            <div class="menu">
-              <div class="menu-item"><span class="plus">+</span><span>Education:</span></div>
-              <ul>
-              {% for edu in user_info.education %}
-              <li>{{ edu.degree }} from {{ edu.school }}</li>
-              {% endfor %}
-              </ul>
-
-              <div class="menu-item"><span class="plus">+</span><span>Work Experience:</span></div>
-              <ul>
-              {% for work in user_info.employment_history %}
-              <li>{{ work.role }} at {{ work.company_name }}</li>
-              {% endfor %}
-              </ul>
-
-              <div class="menu-item"><span class="plus">+</span><span>Projects:</span></div>
-              </ul>
-              <ul>
-              {% for project in user_info.projects %}
-              <li>{{ project }}</li>
-              {% endfor %}
-              </ul>
-
-              <div class="menu-item"><span class="plus">+</span><span>Skills:</span></div>
-              </ul>
-              <ul>
-              {% for skill in user_info.skills %}
-              <li>{{ skill.skill_name }}: {{ skill.proficiency_level }}/4</li>
-              {% endfor %}
-              </ul>
-
-              <div class="menu-item"><span class="plus">+</span><span>Socials:</span></div>
-              </ul>
-              <ul>
-              {% for social in user_info.socials %}
-              <li><a href="{{ social.url }}">{{ social.platform }}</a></li>
-              {% endfor %}
-              </ul>
-            </div>
-            {% else %}
-            <h2 class="right-title">Or, Manually Add Information:</h2>
+            <h2 class="right-title">Your information will appear here:</h2>
 
             <div class="menu">
               <div class="menu-item"><span class="plus">+</span><span>Education:</span></div>
@@ -342,7 +299,6 @@
               <div class="menu-item"><span class="plus">+</span><span>Skills:</span></div>
               <div class="menu-item"><span class="plus">+</span><span>Socials:</span></div>
             </div>
-            {% endif %}
           </section>
         </main>
       </div>
