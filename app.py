@@ -79,8 +79,10 @@ def upload_file():
                 p = Thread(target=update_skill_db, args=[mock_userid, engine, f"uploads/{filename}"])
                 p.start()
                 print("finished scheduling process")
-                #change made so when resumes upload it goes back to the profile instead of default title page
+                #change made so when resumes upload it goes to the profile instead of default title page
                 return redirect(url_for('profile'))
     return redirect(url_for('home'))
+
+
 if __name__ == "__main__":
     app.run(debug=True)

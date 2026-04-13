@@ -2,8 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="refresh" content="5" />
+
+    <meta http-equiv="refresh" content="2">
     <title>JobRec Profile Mockup</title>
     <style>
       * {
@@ -220,12 +222,28 @@
         flex-shrink: 0;
       }
 
+      .circle {
+          margin: 30px auto;
+          width: 110px;
+          height: 110px;
+          border-radius: 50%;
+          border: 10px solid #f7c6da;
+          border-top: 10px solid #ff2d8d;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          100% { transform: rotate(360deg); }
+        }
+
+
       @media (max-width: 760px) {
         .navbar {
           grid-template-columns: 1fr 1fr;
           gap: 8px 16px;
           padding: 14px;
         }
+        
 
         .brand,
         .nav-item {
@@ -250,6 +268,10 @@
           max-width: 360px;
         }
       }
+
+      
+
+
     </style>
   </head>
   <body>
@@ -278,12 +300,10 @@
               <div class="avatar-add">+</div>
             </div>
 
-            <div class="subheading">Analyzing resume...</div>
-            <form>
-              <label for="resume" class="upload-btn">Upload resume</label><br><br>
-              <input type="file" disabled="true" id="resume" name="resume" accept=".pdf,.doc,.docx">
-              <br><br>
-            </form>
+            <div class="subheading" style="color: black; font-size: 24px;">
+              Parsing resume... </div>
+            <div class="circle"></div>
+
           </section>
 
           <section class="right">
