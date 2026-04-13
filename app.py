@@ -20,9 +20,18 @@ mock_userid: bytes = b"team 6"
 engine = create_engine("sqlite+pysqlite:///user_skills.db")
 Base.metadata.create_all(engine)
 
+#removes old user data
+with Session(engine) as session:
+    session.query(UserInfoTable).delete()
+    session.commit()
 
+#new home page
 @app.route('/')
 def home():
+    return render_template("index.html")
+
+@app.route('/profile')
+def profile():
     with Session(engine) as session:
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == mock_userid)
         try:
@@ -30,7 +39,7 @@ def home():
         except:
             return render_template("jobprofile.html")
     if user_info_raw.done_processing:
-        user_info = UserInfo.model_validate_json(user_info_raw.info)
+        user_info = UserInfo.model_validate(user_info_raw.info)
         return render_template("jobprofile.html", user_info=user_info)
     return render_template("jobprofile_processing.html")
 
@@ -70,7 +79,8 @@ def upload_file():
                 p = Thread(target=update_skill_db, args=[mock_userid, engine, f"uploads/{filename}"])
                 p.start()
                 print("finished scheduling process")
-                return redirect(url_for('home'))
+                #change made so when resumes upload it goes back to the profile instead of default title page
+                return redirect(url_for('profile'))
     return redirect(url_for('home'))
 if __name__ == "__main__":
     app.run(debug=True)

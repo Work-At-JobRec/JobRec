@@ -40,15 +40,12 @@
         min-height: 58px;
       }
 
-      .brand,
-      .nav-item {
-        font-weight: 700;
-        line-height: 1;
-      }
-
       .brand {
         font-size: 30px;
         justify-self: start;
+        text-decoration: none;
+        color: #fff;
+        cursor: pointer;
       }
 
       .nav-item {
@@ -258,10 +255,10 @@
     <div class="page">
       <div class="frame">
         <header class="navbar">
-          <div class="brand">JobRec</div>
-          <div class="nav-item">Jobs</div>
-          <div class="nav-item">Search</div>
-          <div class="nav-item">Profile</div>
+          <a href="/" class="brand">JobRec</a>
+          <span class="nav-item disabled">Jobs</span>
+          <span class="nav-item disabled">Search</span>
+          <a href="/profile" class="nav-item">Profile</a>
         </header>
 
         <main class="content">
@@ -328,7 +325,7 @@
               </ul>
               <ul>
               {% for social in user_info.socials %}
-              <li><a href="{{ social.url }}">{{ social.platform }}</a></li>
+              <li><a href="{{ social.url }}" target="_blank">{{ social.platform }}</a></li>
               {% endfor %}
               </ul>
             </div>

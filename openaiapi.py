@@ -72,7 +72,17 @@ def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
             return
         else:
 
-            skill_ranking.info = user_info.model_dump_json()
+            unique_socials = {}
+            for s in user_info.socials:
+                unique_socials[s.platform.lower()] = s
+
+            user_info.socials = list(unique_socials.values())
+
+            for s in user_info.socials:
+                if s.url and not s.url.startswith("http"):
+                    s.url = "https://" + s.url
+
+            skill_ranking.info = user_info.model_dump()
             skill_ranking.done_processing = True
 
         session.commit()
