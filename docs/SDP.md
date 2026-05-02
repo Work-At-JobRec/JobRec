@@ -2,7 +2,7 @@
 Our initial software development plan can be found as a PDF [here](https://github.com/Work-At-JobRec/JobRec/blob/main/docs/Initial%20Software%20Development%20Plan%20Team%201%20(1).pdf)
 
 # Updates to Software Development Plan
-Our comparison document showing proof of updates to the initial software development plan can be found as a PDF [here](https://github.com/Work-At-JobRec/JobRec/blob/main/docs/Comparison%20of%20Final%20Software%20Development%20Plan%20Team%201%20%26%20Initial%20Software%20Development%20Plan%20Team%201%20(1).pdf)
+Our comparison document showing proof of updates to the initial software development plan can be found here: https://docs.google.com/document/d/1aH2SNIXIwzhT0M4kBtHn3lpMsUsbcWcEk3XjL1WXw3I/edit?usp=sharing
 
 # Development Methodology
 Our team has chosen Scrum as the development methodology for the JobRec system. Scrum is an Agile framework that organizes development into short, time-boxed iterations called sprints, allowing teams to continuously inspect progress and adapt based on feedback.
