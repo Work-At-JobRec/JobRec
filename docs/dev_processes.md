@@ -115,12 +115,13 @@ The JobRec repository is organized such that all different areas of the project 
 
 ### Repository Structure
 
+```text
 app
 │
 ├── deploy
 │
 ├── helpers
-│
+│   └── example.sh
 │
 ├── src
 │   ├── templates
@@ -128,7 +129,9 @@ app
 │
 └── test
     └── test_resumes
+
 docs
+```
 
 ### Directory Descriptions
 
