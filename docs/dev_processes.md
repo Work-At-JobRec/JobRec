@@ -91,3 +91,61 @@ Every PR description contains a GitHub closing keyword (Such as `Closes`, `Fixes
 - Larger or riskier changes (Such as authentication flows) necessitate review from at least one teammate familiar with that part of the system before merging.
 - The feature branch is deleted immediately after merge.
 
+## Two-Week Development Cycle
+
+### Closing a Two-Week Cycle
+
+At the end of each two-week development cycle, our regular team meeting (separate from the one with our professor) will be dedicated to verification of the previous two-week cycle before continuing with the next two weeks. Each team member will verify the integrity of their development by demonstrating proper tests were written in accordance with their development when necessary.
+
+After verification of the previous two weeks, each team member will then verify the status of their assigned issues. Team members will ensure that the issues currently assigned to them are not complete yet and will be completed in a timely manner in the next two-week development cycle.
+
+The team will also review progress before beginning the next cycle; if a team member needs work reassigned due to outside time constraints, that will be discussed in this meeting. 
+
+This meeting will also be dedicated to refreshing the project views as outlined in the next section.
+
+### Refreshing GitHub Project Views
+
+After completion of a two week development cycle, the GitHub project views will be updated to reflect what was discussed in the development closure meeting. Issues resolved will be placed into "Done", if not done so already. Issues awaiting merge approval will be placed into "In Review", if not done so already. Issues planning to be worked on within the next two weeks will be placed into "In Progress" in the GitHub views. 
+
+Any issues that seem to have been more complicated than anticipated will be moved into the "Backlog", permitting they are not a high priority dependency.
+
+## Repository Architechture
+
+The JobRec repository is organized such that all different areas of the project have its own dedicated folder. For example, all source code is within the src directory, while all relevant test files are under the src directory. Other directories are dedicated to documentation and storage of different helpers and executable files.
+
+### Repository Structure
+
+app
+│
+├── deploy
+│
+├── helpers
+│
+│
+├── src
+│   ├── templates
+│   └── uploads
+│
+└── test
+    └── test_resumes
+docs
+
+### Directory Descriptions
+
+- `app/` – Contains the main application-related files and directories.
+
+- `app/deploy/` – Stores deployment-ready executables and other files needed for deployment.
+
+- `app/helpers/` – Contains helper scripts and utility functions used by the application.
+
+- `app/src/` – Contains the main source code for the application.
+
+- `app/src/templates/` – Stores HTML templates used by the web application.
+
+- `app/src/uploads/` – Local directory used to store uploaded files during development and testing.
+
+- `app/test/` – Contains files used for testing the application.
+
+- `app/test/test_resumes/` – Stores dummy or sample resumes used when testing resume-processing functionality.
+
+- `docs/` – Contains project documentation, including development-process documentation.
