@@ -20,11 +20,6 @@ mock_userid: bytes = b"team 6"
 engine = create_engine("sqlite+pysqlite:///user_skills.db")
 Base.metadata.create_all(engine)
 
-#removes old user data
-with Session(engine) as session:
-    session.query(UserInfoTable).delete()
-    session.commit()
-
 #new home page
 @app.route('/')
 def home():
