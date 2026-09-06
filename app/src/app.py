@@ -8,7 +8,7 @@ from threading import Thread
 
 
 RESUME_FOLDER = "uploads"
-ALLOWED_EXTENSIONS = {'pdf', 'txt'}
+ALLOWED_EXTENSIONS = {'pdf', 'docx'}
 
 os.makedirs(RESUME_FOLDER, exist_ok=True)
 app = Flask(__name__)
