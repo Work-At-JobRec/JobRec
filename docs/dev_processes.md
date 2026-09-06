@@ -64,7 +64,7 @@ Every PR description contains a GitHub closing keyword (Such as `Closes`, `Fixes
 >
 > **PR Description:**
 > ```
-> Closes GitHub Issue #3
+> Closes #3
 >
 > Implements the resume upload endpoint described in FR-003 
 > (Accurate Job Data Scraping). With this feature, the platform
