@@ -8,7 +8,7 @@ from threading import Thread
 
 
 RESUME_FOLDER = "uploads"
-ALLOWED_EXTENSIONS = {'pdf', 'txt'}
+ALLOWED_EXTENSIONS = {'pdf', 'docx'}
 
 os.makedirs(RESUME_FOLDER, exist_ok=True)
 app = Flask(__name__)
@@ -19,11 +19,6 @@ mock_userid: bytes = b"team 6"
 
 engine = create_engine("sqlite+pysqlite:///user_skills.db")
 Base.metadata.create_all(engine)
-
-#removes old user data
-with Session(engine) as session:
-    session.query(UserInfoTable).delete()
-    session.commit()
 
 #new home page
 @app.route('/')
