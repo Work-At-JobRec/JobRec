@@ -1,0 +1,54 @@
+{
+  "jobs": [
+    {
+      "id": 4012345,
+      "internal_job_id": 2001001,
+      "title": "Software Engineer, Payments",
+      "updated_at": "2026-09-12T13:25:25-04:00",
+      "first_published": "2026-09-03T13:30:34-04:00",
+      "absolute_url": "https://acme.com/jobs?gh_jid=4012345",
+      "location": {
+        "name": "Dublin"
+      },
+      "company_name": "Acme Corp",
+      "requisition_id": "See Opening ID",
+      "departments": [
+        {"id": 81946, "name": "Payments Engineering", "child_ids": [], "parent_id": 78876}
+      ],
+      "offices": [
+        {"id": 87011, "name": "Ireland Locations", "location": null, "child_ids": [], "parent_id": 17446}
+      ],
+      "metadata": null,
+      "content": "&lt;h2&gt;&lt;strong&gt;Who we are&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;Acme builds payment infrastructure &amp; tooling.&lt;/p&gt;"
+    },
+    {
+      "id": 4012346,
+      "internal_job_id": 2001002,
+      "title": "Data Analyst",
+      "updated_at": "2026-09-10T08:00:00Z",
+      "absolute_url": "https://acme.com/jobs?gh_jid=4012346",
+      "requisition_id": "See Opening ID",
+      "departments": [],
+      "offices": [],
+      "metadata": null
+    },
+    {
+      "id": 4012347,
+      "internal_job_id": 2001003,
+      "title": "Product Designer",
+      "absolute_url": "https://acme.com/jobs?gh_jid=4012347",
+      "location": {
+        "name": null
+      },
+      "company_name": "Acme Corp",
+      "requisition_id": "See Opening ID",
+      "departments": [],
+      "offices": [],
+      "metadata": null,
+      "content": "&lt;p&gt;Design delightful products.&lt;/p&gt;"
+    }
+  ],
+  "meta": {
+    "total": 3
+  }
+}

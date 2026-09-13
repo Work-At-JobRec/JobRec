@@ -7,3 +7,4 @@ sqlalchemy
 pytest
 pypdf
 python-docx
+requests
