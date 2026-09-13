@@ -5,3 +5,4 @@ openai
 pydantic
 sqlalchemy
 pytest
+requests
