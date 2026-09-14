@@ -6,4 +6,4 @@ pydantic
 sqlalchemy
 pytest
 pypdf
-docx
+python-docx
