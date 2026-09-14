@@ -3,13 +3,25 @@ import os
 import sys
 from unittest.mock import patch
 
-# Lets this test import app/src/app.py
+# Lets this test import files from app/src
 SRC_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "src")
 )
 sys.path.insert(0, SRC_DIR)
 
+# These MUST come after sys.path.insert(...)
 from app import app, allowed_file
+
+from openaiapi import (
+    Base,
+    UserInfoTable,
+    UserInfo,
+    SkillRanking,
+    update_skill_db,
+)
+
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
 
 # Tests if PDF is allowed to be uploaded
 def test_pdf_is_allowed():
@@ -110,3 +122,60 @@ def test_png_upload_is_rejected(tmp_path):
     )
 
     assert not (tmp_path / "resume.png").exists()    
+    
+# Tests if extracted skills are displayed on the user profile
+def test_profile_displays_skills(tmp_path):
+    # Create a temporary database just for this test
+    test_db = tmp_path / "test_user_skills.db"
+    test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
+    Base.metadata.create_all(test_engine)
+
+    # Must match the mock_userid currently used by app.py
+    test_user_id = b"team 6"
+
+    # Dummy user info containing skills to display
+    dummy_user_info = UserInfo(
+        skills=[
+            SkillRanking(
+                skill_name="Python",
+                proficiency_level=4
+            ),
+            SkillRanking(
+                skill_name="C",
+                proficiency_level=3
+            ),
+        ],
+        education=[],
+        projects=[],
+        socials=[],
+        employment_history=[]
+    )
+
+    # Store the dummy user info in the temporary database
+    with Session(test_engine) as session:
+        user = UserInfoTable(
+            user_id=test_user_id,
+            info=dummy_user_info.model_dump(),
+            done_processing=True
+        )
+
+        session.add(user)
+        session.commit()
+
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    # Make app.py use our temporary database
+    with patch("app.engine", test_engine):
+        response = client.get("/profile")
+
+    assert response.status_code == 200
+
+    # Get the rendered HTML from the profile page
+    html = response.get_data(as_text=True)
+
+    # Verify the skills are displayed on the profile
+    assert "Python" in html
+    assert "C" in html
+    assert "4/4" in html
+    assert "3/4" in html
