@@ -3,13 +3,26 @@ import os
 import sys
 from unittest.mock import patch
 
-# Lets this test import app/src/app.py
+
+# Lets this test import files from app/src
 SRC_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "src")
 )
 sys.path.insert(0, SRC_DIR)
 
+# These MUST come after sys.path.insert(...)
 from app import app, allowed_file
+
+from openaiapi import (
+    Base,
+    UserInfoTable,
+    UserInfo,
+    SkillRanking,
+    update_skill_db,
+)
+
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
 
 # Tests if PDF is allowed to be uploaded
 def test_pdf_is_allowed():
@@ -27,8 +40,8 @@ def test_txt_is_not_allowed():
 def test_jpg_is_not_allowed():
     assert not allowed_file("resume.jpg")
 
-# Tests if a dummy pdf resume is saved    
-def test_pdf_upload_is_saved(tmp_path):
+# Tests if a corrupted/dummy PDF resume is rejected and not saved
+def test_corrupted_pdf_upload_is_not_saved(tmp_path):
     app.config["TESTING"] = True
     app.config["UPLOAD_FOLDER"] = str(tmp_path)
 
@@ -36,7 +49,7 @@ def test_pdf_upload_is_saved(tmp_path):
 
     fake_pdf = io.BytesIO(b"fake pdf contents")
 
-    with patch("app.Thread") as mock_thread:
+    with patch("app.Thread"):
         response = client.post(
             "/upload",
             data={
@@ -47,11 +60,12 @@ def test_pdf_upload_is_saved(tmp_path):
 
     uploaded_file = tmp_path / "test_resume.pdf"
 
-    assert uploaded_file.exists()
+    assert not uploaded_file.exists()
     assert response.status_code == 302
-    
-# Tests if a dummy docx resume is saved    
-def test_docx_upload_is_saved(tmp_path):
+
+
+# Tests if a corrupted/dummy DOCX resume is rejected and not saved
+def test_corrupted_docx_upload_is_not_saved(tmp_path):
     app.config["TESTING"] = True
     app.config["UPLOAD_FOLDER"] = str(tmp_path)
 
@@ -69,6 +83,74 @@ def test_docx_upload_is_saved(tmp_path):
         )
 
     uploaded_file = tmp_path / "test_resume.docx"
+
+    assert not uploaded_file.exists()
+    assert response.status_code == 302
+
+
+# Tests if a real PDF resume is accepted and saved
+def test_valid_pdf_upload_is_saved(tmp_path):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+
+    client = app.test_client()
+
+    resume_path = os.path.join(
+        os.path.dirname(__file__),
+        "test_resumes",
+        "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+    )
+
+    with open(resume_path, "rb") as resume_file:
+        with patch("app.Thread"):
+            response = client.post(
+                "/upload",
+                data={
+                    "resume": (
+                        resume_file,
+                        "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+                    )
+                },
+                content_type="multipart/form-data",
+            )
+
+    uploaded_file = (
+        tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+    )
+
+    assert uploaded_file.exists()
+    assert response.status_code == 302
+
+
+# Tests if a real DOCX resume is accepted and saved
+def test_valid_docx_upload_is_saved(tmp_path):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+
+    client = app.test_client()
+
+    resume_path = os.path.join(
+        os.path.dirname(__file__),
+        "test_resumes",
+        "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
+    )
+
+    with open(resume_path, "rb") as resume_file:
+        with patch("app.Thread"):
+            response = client.post(
+                "/upload",
+                data={
+                    "resume": (
+                        resume_file,
+                        "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
+                    )
+                },
+                content_type="multipart/form-data",
+            )
+
+    uploaded_file = (
+        tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
+    )
 
     assert uploaded_file.exists()
     assert response.status_code == 302    
