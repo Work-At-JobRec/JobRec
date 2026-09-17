@@ -1,5 +1,5 @@
 import os
-from flask import Flask, flash, request, redirect, render_template, url_for
+from flask import Flask, flash, request, redirect, render_template, url_for, jsonify
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
@@ -42,6 +42,25 @@ def profile():
         user_info = UserInfo.model_validate(user_info_raw.info)
         return render_template("jobprofile.html", user_info=user_info)
     return render_template("jobprofile_processing.html")
+
+@app.route('/api/profile')
+def profile_api():
+    with Session(engine) as session:
+        stmt = select(UserInfoTable).where(
+            UserInfoTable.user_id == mock_userid
+        )
+
+        user_info_raw = session.scalars(stmt).one_or_none()
+
+        if user_info_raw is None:
+            return jsonify({"error": "User not found"}), 404
+
+        if not user_info_raw.done_processing:
+            return jsonify({"processing": True}), 202
+
+        user_info = UserInfo.model_validate(user_info_raw.info)
+
+        return jsonify(user_info.model_dump())
 
 def allowed_file(filename):
     return '.' in filename and \

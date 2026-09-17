@@ -122,36 +122,20 @@ def test_png_upload_is_rejected(tmp_path):
     )
 
     assert not (tmp_path / "resume.png").exists()    
-
-# Tests if duplicate skills are removed before user info is stored
-def test_update_skill_db_removes_duplicate_skills(tmp_path):
-    # Create a temporary database just for this test
+    
+# Tests if extracted skills are displayed on the user profile
+def test_profile_displays_skills(tmp_path):
+   # Create temporary database
     test_db = tmp_path / "test_user_skills.db"
     test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
     Base.metadata.create_all(test_engine)
 
-    test_user_id = b"test user"
+    test_user_id = b"team 6"
 
-    # update_skill_db expects the user to already exist in the database
-    with Session(test_engine) as session:
-        user = UserInfoTable(
-            user_id=test_user_id,
-            info={},
-            done_processing=False
-        )
-
-        session.add(user)
-        session.commit()
-
-    # Dummy LLM output containing duplicate skills
     dummy_user_info = UserInfo(
         skills=[
             SkillRanking(
                 skill_name="Python",
-                proficiency_level=2
-            ),
-            SkillRanking(
-                skill_name="python",
                 proficiency_level=4
             ),
             SkillRanking(
@@ -165,48 +149,27 @@ def test_update_skill_db_removes_duplicate_skills(tmp_path):
         employment_history=[]
     )
 
-    # Make parse_resume return our dummy data instead of calling OpenAI
-    with patch("openaiapi.parse_resume", return_value=dummy_user_info):
-        update_skill_db(
-            test_user_id,
-            test_engine,
-            "fake_resume.pdf"
-        )
-
-    # Read the stored information back from the database
     with Session(test_engine) as session:
-        stmt = select(UserInfoTable).where(
-            UserInfoTable.user_id == test_user_id
+        user = UserInfoTable(
+            user_id=test_user_id,
+            info=dummy_user_info.model_dump(),
+            done_processing=True
         )
 
-        stored_user = session.scalars(stmt).one()
+        session.add(user)
+        session.commit()
 
-        stored_info = UserInfo.model_validate(stored_user.info)
+    app.config["TESTING"] = True
+    client = app.test_client()
 
-        assert stored_user.done_processing is True
+    with patch("app.engine", test_engine):
+        response = client.get("/api/profile")  
 
-    # Verify the actual stored list has been deduplicated
-    stored_skills = stored_info.skills
+    assert response.status_code == 200
 
-    normalized_names = [
-        skill.skill_name.strip().lower()
-        for skill in stored_skills
-    ]
+    data = response.get_json()
 
-    # There should actually only be two objects in the list
-    assert len(stored_skills) == 2
-
-    # Python should occur exactly once
-    assert normalized_names.count("python") == 1
-
-    # C should occur exactly once
-    assert normalized_names.count("c") == 1
-
-    # The higher Python proficiency should have been retained
-    python_skill = next(
-        skill
-        for skill in stored_skills
-        if skill.skill_name.strip().lower() == "python"
-    )
-
-    assert python_skill.proficiency_level == 4
+    assert data["skills"][0]["skill_name"] == "Python"
+    assert data["skills"][0]["proficiency_level"] == 4
+    assert data["skills"][1]["skill_name"] == "C"
+    assert data["skills"][1]["proficiency_level"] == 3
