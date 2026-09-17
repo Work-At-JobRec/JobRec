@@ -5,95 +5,46 @@
   <title>JobRec</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-
-  <style>
-    body {
-      margin: 0;
-      background: white;
-      font-family: 'Inter', sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding-top: 80px;
-      text-align: center;
-    }
-
-    .navbar {
-      background: #000;
-      color: #fff;
-      display: grid;
-      grid-template-columns: 1.5fr 1fr 1fr 1fr;
-      align-items: center;
-      padding: 10px 18px;
-      min-height: 58px;
-      width: 100%;
-      position: fixed;
-      top: 0;
-      left: 0;
-    }
-
-    .brand {
-      font-size: 30px;
-      font-weight: 700;
-      justify-self: start;
-      text-decoration: none;
-      color: #fff;
-    }
-
-    .nav-item {
-      font-size: 28px;
-      font-weight: 700;
-      justify-self: center;
-      color: #fff;
-    }
-
-    .disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-
-    .title {
-      font-size: 96px;
-      font-weight: 700;
-      color: black;
-      margin-top: 80px;
-      margin-bottom: 20px;
-    }
-
-    .subtitle {
-      font-size: 22px;
-      max-width: 800px;
-      color: black;
-      margin-bottom: 30px;
-      line-height: 1.5;
-    }
-
-    .authors {
-      font-size: 15px;
-      color: black;
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
 </head>
 
-<body>
+<body class="m-0 bg-white font-['Inter',sans-serif]">
 
-  <header class="navbar">
-    <a href="/" class="brand">JobRec</a>
-    <span class="nav-item disabled">Jobs</span>
-    <span class="nav-item disabled">Search</span>
-    <a href="/profile" class="nav-item">Profile</a>
-  </header>
+  <div id="root"></div>
 
-  <div class="title">JobRec</div>
+  <script type="text/babel" data-type="module">
+    const { useState } = React;
 
-  <div class="subtitle">
-    The applicant-focused job board you didn't know you needed!
-  </div>
+    function Navbar() {
+      return (
+        <header className="bg-black text-white grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center py-2.5 px-[18px] min-h-[58px] w-full fixed top-0 left-0">
+          <a href="/" className="text-[30px] font-bold justify-self-start no-underline text-white">JobRec</a>
+          <span className="text-[28px] font-bold justify-self-center opacity-50 cursor-default">Jobs</span>
+          <span className="text-[28px] font-bold justify-self-center opacity-50 cursor-default">Search</span>
+          <a href="/profile" className="text-[28px] font-bold justify-self-center text-white">Profile</a>
+        </header>
+      );
+    }
 
-  <div class="authors">
-    Sharvari Deshpande, Luna Brown, Luke McCartney, and Pranav Putta
-  </div>
+    function Home() {
+      return (
+        <div className="flex flex-col items-center min-h-screen pt-20 text-center">
+          <Navbar />
+          <div className="text-[96px] font-bold text-black mt-20 mb-5">JobRec</div>
+          <div className="text-[22px] max-w-[800px] text-black mb-[30px] leading-relaxed">
+            The applicant-focused job board you didn't know you needed!
+          </div>
+          <div className="text-[15px] text-black">
+            Sharvari Deshpande, Luna Brown, Luke McCartney, and Pranav Putta
+          </div>
+        </div>
+      );
+    }
 
+    ReactDOM.createRoot(document.getElementById("root")).render(<Home />);
+  </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 import os
 from flask import Flask, flash, request, redirect, render_template, url_for
 from werkzeug.utils import secure_filename
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
 from openaiapi import UserInfoTable, update_skill_db, UserInfo, Base
 from threading import Thread
@@ -20,6 +20,11 @@ mock_userid: bytes = b"team 6"
 engine = create_engine("sqlite+pysqlite:///user_skills.db")
 Base.metadata.create_all(engine)
 
+# Development only: clear user data whenever app starts
+with Session(engine) as session:
+    session.execute(delete(UserInfoTable))
+    session.commit()
+    
 #new home page
 @app.route('/')
 def home():
