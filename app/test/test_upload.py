@@ -125,15 +125,13 @@ def test_png_upload_is_rejected(tmp_path):
     
 # Tests if extracted skills are displayed on the user profile
 def test_profile_displays_skills(tmp_path):
-    # Create a temporary database just for this test
+   # Create temporary database
     test_db = tmp_path / "test_user_skills.db"
     test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
     Base.metadata.create_all(test_engine)
 
-    # Must match the mock_userid currently used by app.py
     test_user_id = b"team 6"
 
-    # Dummy user info containing skills to display
     dummy_user_info = UserInfo(
         skills=[
             SkillRanking(
@@ -151,7 +149,6 @@ def test_profile_displays_skills(tmp_path):
         employment_history=[]
     )
 
-    # Store the dummy user info in the temporary database
     with Session(test_engine) as session:
         user = UserInfoTable(
             user_id=test_user_id,
@@ -165,17 +162,14 @@ def test_profile_displays_skills(tmp_path):
     app.config["TESTING"] = True
     client = app.test_client()
 
-    # Make app.py use our temporary database
     with patch("app.engine", test_engine):
-        response = client.get("/profile")
+        response = client.get("/api/profile")  
 
     assert response.status_code == 200
 
-    # Get the rendered HTML from the profile page
-    html = response.get_data(as_text=True)
+    data = response.get_json()
 
-    # Verify the skills are displayed on the profile
-    assert "Python" in html
-    assert "C" in html
-    assert "4/4" in html
-    assert "3/4" in html
+    assert data["skills"][0]["skill_name"] == "Python"
+    assert data["skills"][0]["proficiency_level"] == 4
+    assert data["skills"][1]["skill_name"] == "C"
+    assert data["skills"][1]["proficiency_level"] == 3
