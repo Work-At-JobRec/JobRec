@@ -71,7 +71,21 @@ def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
             skill_ranking.done_processing = True
             return
         else:
+            # Deduplicate skills
+            unique_skills = {}
 
+            for skill in user_info.skills:
+                normalized_name = skill.skill_name.strip().lower()
+
+                if normalized_name not in unique_skills:
+                    unique_skills[normalized_name] = skill
+                else:
+                    # Keep whichever duplicate has the higher proficiency
+                    if skill.proficiency_level > unique_skills[normalized_name].proficiency_level:
+                        unique_skills[normalized_name] = skill
+
+            user_info.skills = list(unique_skills.values())
+            
             unique_socials = {}
             for s in user_info.socials:
                 unique_socials[s.platform.lower()] = s
