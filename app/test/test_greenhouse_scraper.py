@@ -141,3 +141,14 @@ def test_parse_iso8601_invalid_or_missing_returns_none():
     assert parse_iso8601("not a date") is None
     assert parse_iso8601("") is None
     assert parse_iso8601(None) is None
+
+
+# One job that cannot be mapped is skipped instead of losing the whole board
+def test_fetch_jobs_skips_job_that_cannot_be_mapped():
+    payload = load_fixture()
+    payload["jobs"].insert(1, {"id": 999, "title": 123, "absolute_url": "https://acme.com/jobs?gh_jid=999"})
+    payload["jobs"].insert(2, {"id": 998, "title": "Bad location", "location": "Dublin"})
+
+    jobs = make_scraper(payload=payload).fetch_jobs()
+
+    assert [job.source_job_id for job in jobs] == ["4012345", "4012346", "4012347"]

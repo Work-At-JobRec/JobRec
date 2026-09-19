@@ -51,7 +51,7 @@ class GreenhouseScraper(BaseScraper):
     def fetch_jobs(self) -> list[JobListing]:
         url = GREENHOUSE_JOBS_URL.format(board_token=self.board_token)
         data = self._get_json(url, params={"content": "true"})
-        return [self._to_listing(job) for job in data.get("jobs", [])]
+        return self._build_listings(data.get("jobs") or [], self._to_listing)
 
     def _to_listing(self, job: dict) -> JobListing:
         """Map one Greenhouse job object onto the standardized JobListing model."""
