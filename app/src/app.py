@@ -220,6 +220,8 @@ def valid_resume_file(filepath):
 @app.route('/upload', methods=['GET', 'POST'])
 async def upload_file():
     user = await auth0().get_user({"request": request})
+    if user is None:
+        return redirect(url_for("login"))
     if request.method == 'POST':
         # check if the post request has the file part
         if 'resume' not in request.files:
