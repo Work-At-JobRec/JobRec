@@ -85,3 +85,4 @@ def test_resume_skill_extraction(request):
     for skill in user_info.skills:
         assert skill.skill_name.strip() != ""
         assert 1 <= skill.proficiency_level <= 4
+

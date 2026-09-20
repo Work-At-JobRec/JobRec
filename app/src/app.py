@@ -143,8 +143,9 @@ async def personal_info_api():
         user_info_raw = session.scalars(stmt).one_or_none()
         if user_info_raw is None:
             return Response(status=400)
-
-        return jsonify(user_info_raw.model_dump())
+        res = dict(user_info_raw.__dict__)
+        res.pop('_sa_instance_state')
+        return jsonify(res)
 
 def allowed_file(filename):
     return '.' in filename and \
