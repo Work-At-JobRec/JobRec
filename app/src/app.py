@@ -31,10 +31,11 @@ engine = create_engine("sqlite+pysqlite:///user_skills.db")
 Base.metadata.create_all(engine)
 
 # Development only: clear user data whenever app starts
-with Session(engine) as session:
-    session.execute(delete(UserInfoTable))
-    session.execute(delete(UserPersonal))
-    session.commit()
+if(env.get("DEV") is not None):
+    with Session(engine) as session:
+        session.execute(delete(UserInfoTable))
+        session.execute(delete(UserPersonal))
+        session.commit()
 
 Base.metadata.create_all(engine)
 
