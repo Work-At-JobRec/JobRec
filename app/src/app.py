@@ -1,4 +1,5 @@
 import os
+from os import environ as env
 from flask import Flask, flash, request, redirect, render_template, url_for, jsonify
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
@@ -18,7 +19,8 @@ app.secret_key = "test"
 
 mock_userid: bytes = b"team 6"
 
-engine = create_engine("sqlite+pysqlite:///user_skills.db")
+
+engine = create_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
 Base.metadata.create_all(engine)
 
 # Development only: clear user data whenever app starts
