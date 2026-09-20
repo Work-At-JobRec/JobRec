@@ -55,13 +55,15 @@ def test_corrupted_pdf_upload_is_not_saved(tmp_path):
     fake_pdf = io.BytesIO(b"fake pdf contents")
 
     with patch("app.Thread"):
-        response = client.post(
-            "/upload",
-            data={
-                "resume": (fake_pdf, "test_resume.pdf")
-            },
-            content_type="multipart/form-data",
-        )
+        with patch("app.auth0") as mock_auth0:
+            mock_auth0.return_value = mock_auth_server()
+            response = client.post(
+                "/upload",
+                data={
+                    "resume": (fake_pdf, "test_resume.pdf")
+                },
+                content_type="multipart/form-data",
+            )
 
     uploaded_file = tmp_path / "test_resume.pdf"
 
@@ -79,13 +81,15 @@ def test_corrupted_docx_upload_is_not_saved(tmp_path):
     fake_docx = io.BytesIO(b"fake docx contents")
 
     with patch("app.Thread"):
-        response = client.post(
-            "/upload",
-            data={
-                "resume": (fake_docx, "test_resume.docx")
-            },
-            content_type="multipart/form-data",
-        )
+        with patch("app.auth0") as mock_auth0:
+            mock_auth0.return_value = mock_auth_server()
+            response = client.post(
+                "/upload",
+                data={
+                    "resume": (fake_docx, "test_resume.docx")
+                },
+                content_type="multipart/form-data",
+            )
 
     uploaded_file = tmp_path / "test_resume.docx"
 
