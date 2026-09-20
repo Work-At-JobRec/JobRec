@@ -1,7 +1,7 @@
 import os
 from os import environ as env
 from urllib.parse import urlparse
-from flask import Flask, flash, request, redirect, render_template, url_for, jsonify, after_this_request
+from flask import Flask, flash, request, redirect, render_template, url_for, jsonify, Response
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
@@ -87,7 +87,7 @@ async def home():
 async def profile():
     user = await auth0().get_user({"request": request})
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     with Session(engine) as session:
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == user.get("sub"))
         try:
@@ -112,7 +112,7 @@ async def profile():
 async def profile_api():
     user = await auth0().get_user({"request": request})
     if user is None:
-        return 403
+        return Response(status=403)
     with Session(engine) as session:
         stmt = select(UserInfoTable).where(
             UserInfoTable.user_id == user.get("sub")
@@ -134,7 +134,7 @@ async def profile_api():
 async def personal_info_api():
     user = await auth0().get_user({"request": request})
     if user is None:
-        return 403
+        return Response(status=403)
     with Session(engine) as session:
         stmt = select(UserPersonal).where(
             UserPersonal.user_id == user.get("sub")
@@ -142,7 +142,7 @@ async def personal_info_api():
 
         user_info_raw = session.scalars(stmt).one_or_none()
         if user_info_raw is None:
-            return 400
+            return Response(status=400)
 
         return jsonify(user_info_raw.model_dump())
 
@@ -176,7 +176,7 @@ def valid_resume_file(filepath):
 async def upload_file():
     user = await auth0().get_user({"request": request})
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     if request.method == 'POST':
         # check if the post request has the file part
         if 'resume' not in request.files:
@@ -210,13 +210,7 @@ async def upload_file():
                     user_info = session.scalars(stmt).one()
                     user_info.done_processing = False
                 except:
-                    user_info = UserInfoTable(
-                        user_id=mock_userid,
-                        info="{}",
-                        done_processing=False
-                    )
-                session.add(user_info)
-                session.commit()
+                    return redirect(url_for("onboarding_page"))
                 p = Thread(
                     target=update_skill_db,
                     args=[user.get("sub"), engine, filepath]
