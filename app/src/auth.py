@@ -52,7 +52,7 @@ def auth0():
         domain=env.get("AUTH0_DOMAIN"),
         client_id=env.get("AUTH0_CLIENT_ID"),
         client_secret=env.get("AUTH0_CLIENT_SECRET"),
-        redirect_uri=env.get("APP_BASE_URL") + "/callback",
+        redirect_uri=env.get("APP_BASE_URL", "http://localhost:5000") + "/callback",
         authorization_params={"scope": "openid profile email"},
         secret=session_secret,
         state_store=CookieStore(session_secret, "_a0_session", 259200, StateData),  # 3 days
