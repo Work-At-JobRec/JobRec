@@ -21,7 +21,6 @@ class UserPersonal(Base):
     email = sqlalchemy.Column("email", sqlalchemy.String)
     phone = sqlalchemy.Column("phone", sqlalchemy.String)
     address = sqlalchemy.Column("address", sqlalchemy.String)
-    location = sqlalchemy.Column("location", sqlalchemy.String)
     # TODO: validation of types
 
 
@@ -71,14 +70,12 @@ class UserInfo(BaseModel):
 
 def update_skill_db(user_id: str, engine: sqlalchemy.Engine, filename: str):
     user_info = parse_resume(filename)
-    print("done parsing")
     with Session(engine) as session:
 
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
         try:
             skill_ranking = session.scalars(stmt).one()
         except:
-            print('uncommitted')
             return None
 
         if user_info is None:

@@ -124,8 +124,33 @@ async def logout():
 
 # END: auth0 boilerplate
 
-@app.route('/onboarding')
+@app.route('/onboarding', methods=["GET"])
+async def onboarding_page():
+    user = await auth0().get_user({"request": request})
+    if user is None:
+        return redirect(url_for("home"))
+    with Session(engine) as session:
+        stmt = select(UserInfoTable).where(UserInfoTable.user_id == user.get("sub"))
+        try:
+            _ = session.scalars(stmt).one()
+        except:
+            return render_template("onboarding.html")
+        return redirect(url_for("home"))
+    
 
+@app.route('/onboarding', methods=["POST"])
+async def complete_onboarding():
+
+    user = await auth0().get_user({"request": request})
+    if user is None:
+        return redirect(url_for("home"))
+    with Session(engine) as session:
+        new_user = UserInfoTable(user_id = user.get("sub"), info = '{}', done_processing = True)
+        new_user_personals = UserPersonal(user_id = user.get("sub"), name = request.form.get("name"), email = request.form.get("email"), phone = request.form.get("phone"), address = request.form.get("address"))
+        session.add(new_user)
+        session.add(new_user_personals)
+        session.commit()
+    return redirect(url_for("profile"))
 
 #new home page
 @app.route('/')
@@ -137,12 +162,8 @@ async def home():
             try:
                 _ = session.scalars(stmt).one()
             except:
-                new_user = UserInfoTable(user_id = user.get("sub"), info = '{}', done_processing = True)
-                new_user_personals = UserPersonal(user_id = user.get("sub"), name = "New User", email = user.get("email", ""), phone = "", address = "", location = "")
-                session.add(new_user)
-                session.add(new_user_personals)
-                session.commit()
-    return render_template("index.html")
+                return redirect(url_for("onboarding_page"))
+    return render_template("index.html", authenticated=not (user is None))
 
 @app.route('/profile')
 async def profile():
@@ -190,6 +211,22 @@ async def profile_api():
         user_info = UserInfo.model_validate(user_info_raw.info)
 
         return jsonify(user_info.model_dump())
+
+@app.route("/api/personal_info")
+async def personal_info_api():
+    user = await auth0().get_user({"request": request})
+    if user is None:
+        return 403
+    with Session(engine) as session:
+        stmt = select(UserPersonal).where(
+            UserPersonal.user_id == user.get("sub")
+        )
+
+        user_info_raw = session.scalars(stmt).one_or_none()
+        if user_info_raw is None:
+            return 400
+
+        return jsonify(user_info_raw.model_dump())
 
 def allowed_file(filename):
     return '.' in filename and \

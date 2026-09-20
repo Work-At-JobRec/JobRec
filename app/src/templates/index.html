@@ -24,7 +24,11 @@
           <a href="/" className="text-[30px] font-bold justify-self-start no-underline text-white">JobRec</a>
           <span className="text-[28px] font-bold justify-self-center opacity-50 cursor-default">Jobs</span>
           <span className="text-[28px] font-bold justify-self-center opacity-50 cursor-default">Search</span>
+          {% if authenticated %}
           <a href="/profile" className="text-[28px] font-bold justify-self-center text-white">Profile</a>
+          {% else %}
+          <a href="/login" className="text-[28px] font-bold justify-self-center text-white">Log In or Register</a>
+          {% endif %}
         </header>
       );
     }

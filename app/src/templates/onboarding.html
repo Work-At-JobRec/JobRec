@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JobRec Onboarding</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+</head>
+
+<body class="m-0 bg-white font-['Inter',sans-serif]">
+
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    const { useState } = React;
+
+    function Home() {
+      return (
+        <div className="flex flex-col items-center min-h-screen pt-20 text-center">
+          <div className="text-[96px] font-bold text-black mt-20 mb-5">Welcome, new user</div>
+          <div className="text-[22px] text-black text-center">Complete your profile:</div>
+          
+          <form method="post">
+            <div class="grid gap-6 mb-6 md:grid-cols-2">
+                <div>
+                    <label for="name" class="block mb-2.5 text-sm font-medium text-heading">Name</label>
+                    <input type="text" id="name" name="name" class="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                </div>
+                <div>
+                    <label for="email" class="block mb-2.5 text-sm font-medium text-heading">Email</label>
+                    <input type="email" id="email" name="email" class="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                </div>
+                <div>
+                    <label for="phone" class="block mb-2.5 text-sm font-medium text-heading">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" class="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                </div>
+                <div>
+                    <label for="address" class="block mb-2.5 text-sm font-medium text-heading">Address</label>
+                    <input type="text" id="address" name="address" class="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                </div>
+            </div>
+            <button type="submit" class="text-black bg-brand box-border border">Submit</button>
+          </form>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<Home />);
+  </script>
+</body>
+</html>
