@@ -13,10 +13,22 @@ client = OpenAI()
 class Base(DeclarativeBase):
     pass
 
+class UserPersonal(Base):
+    __tablename__ = "user_personal"
+
+    user_id = sqlalchemy.Column("user_id", sqlalchemy.String, primary_key=True)
+    name = sqlalchemy.Column("user_name", sqlalchemy.String)
+    email = sqlalchemy.Column("email", sqlalchemy.String)
+    phone = sqlalchemy.Column("phone", sqlalchemy.String)
+    address = sqlalchemy.Column("address", sqlalchemy.String)
+    location = sqlalchemy.Column("location", sqlalchemy.String)
+    # TODO: validation of types
+
+
 class UserInfoTable(Base):
     __tablename__ = "user_info"
 
-    user_id = sqlalchemy.Column("user_id", sqlalchemy.BLOB, primary_key=True)
+    user_id = sqlalchemy.Column("user_id", sqlalchemy.String, primary_key=True)
     info = sqlalchemy.Column("skills", sqlalchemy.JSON)
     done_processing = sqlalchemy.Column("done_processing", sqlalchemy.Boolean)
 
@@ -57,14 +69,16 @@ class UserInfo(BaseModel):
 
 
 
-def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
+def update_skill_db(user_id: str, engine: sqlalchemy.Engine, filename: str):
     user_info = parse_resume(filename)
+    print("done parsing")
     with Session(engine) as session:
 
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
         try:
             skill_ranking = session.scalars(stmt).one()
         except:
+            print('uncommitted')
             return None
 
         if user_info is None:
