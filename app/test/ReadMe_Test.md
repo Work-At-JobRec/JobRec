@@ -1,8 +1,6 @@
 # Testing
 
-This directory contains automated tests, test fixtures, and manual testing
-records for JobRec (see `docs/dev_processes.md` for full repository
-architecture).
+This directory contains the automated tests, test fixtures, and the manual testing records for JobRec (see `docs/dev_processes.md` for the full repo architecture).
 
 ## Root Cause Analyses Completed
 
