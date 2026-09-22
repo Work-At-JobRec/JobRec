@@ -3,17 +3,28 @@ import Navbar from "../components/Navbar.jsx";
 import Avatar from "../components/Avatar.jsx";
 import MenuItem from "../components/MenuItem.jsx";
 
-function LeftPanel({ processing, onUpload }) {
+const PLACEHOLDER_CONTACT = {
+  name: "Jane Smith",
+  email: "janesmith100@gmail.com",
+  phone: "(+1) 650-890-0093",
+  location: "West Lafayette, IN",
+};
+
+function LeftPanel({ processing, userInfo, onUpload }) {
+  const contact = userInfo ?? PLACEHOLDER_CONTACT;
+
   return (
     <section className="border-r border-[#bdbdbd] text-center flex flex-col justify-center p-[34px_34px_40px] md:border-r md:border-b-0 border-b">
       <h1 className="m-0 mb-6 text-[30px] font-bold">Your Profile</h1>
-      <p className="m-0 text-2xl font-bold">Jane Smith</p>
-      <p className="m-0 mt-1 text-2xl font-bold">janesmith100@gmail.com</p>
-      <p className="m-0 mt-1 text-2xl font-bold">(+1) 650-890-0093</p>
-      <div className="mt-2.5 text-[#9b9b9b] text-[17px] inline-flex items-center justify-center gap-1.5">
-        <span>📍</span>
-        <span>West Lafayette, IN</span>
-      </div>
+      {contact.name && <p className="m-0 text-2xl font-bold">{contact.name}</p>}
+      {contact.email && <p className="m-0 mt-1 text-2xl font-bold">{contact.email}</p>}
+      {contact.phone && <p className="m-0 mt-1 text-2xl font-bold">{contact.phone}</p>}
+      {contact.location && (
+        <div className="mt-2.5 text-[#9b9b9b] text-[17px] inline-flex items-center justify-center gap-1.5">
+          <span>📍</span>
+          <span>{contact.location}</span>
+        </div>
+      )}
 
       <Avatar editable={!processing} />
 
@@ -175,7 +186,7 @@ export default function Profile() {
       <div className="w-full min-h-screen bg-[#f4f4f4]">
         <Navbar />
         <main className="grid md:grid-cols-[42%_58%] grid-cols-1 min-h-[calc(100vh-58px)] items-stretch">
-          <LeftPanel processing={processing} onUpload={handleUpload} />
+          <LeftPanel processing={processing} userInfo={userInfo} onUpload={handleUpload} />
           {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} />}
         </main>
       </div>
