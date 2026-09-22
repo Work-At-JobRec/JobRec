@@ -1,3 +1,4 @@
+import traceback
 from openai import OpenAI
 from dotenv import load_dotenv
 from typing import Annotated
@@ -58,7 +59,12 @@ class UserInfo(BaseModel):
 
 
 def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
-    user_info = parse_resume(filename)
+    try:
+        user_info = parse_resume(filename)
+    except Exception:
+        traceback.print_exc()
+        user_info = None
+
     with Session(engine) as session:
 
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
@@ -69,7 +75,6 @@ def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
 
         if user_info is None:
             skill_ranking.done_processing = True
-            return
         else:
 
             unique_socials = {}
