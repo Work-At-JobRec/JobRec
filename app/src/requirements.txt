@@ -1,4 +1,4 @@
-flask
+flask[async]
 werkzeug
 dotenv
 openai
@@ -8,3 +8,5 @@ pytest
 pypdf
 python-docx
 requests
+auth0-server-python
+dotenv
