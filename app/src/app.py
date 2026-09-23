@@ -38,11 +38,11 @@ def profile():
         try:
             user_info_raw = session.scalars(stmt).one()
         except:
-            return render_template("jobprofile.html")
+            return jsonify(status="empty", user_info=None)
     if user_info_raw.done_processing:
         user_info = UserInfo.model_validate(user_info_raw.info)
-        return render_template("jobprofile.html", user_info=user_info)
-    return render_template("jobprofile_processing.html")
+        return jsonify(status="done", user_info=user_info.model_dump())
+    return jsonify(status="processing", user_info=None)
 
 @app.route('/api/profile')
 def profile_api():
@@ -144,4 +144,6 @@ def upload_file():
     return redirect(url_for('home'))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Port 5000 conflicts with macOS's AirPlay Receiver (ControlCenter),
+    # which silently steals a share of requests on that port.
+    app.run(debug=True, port=5001)
