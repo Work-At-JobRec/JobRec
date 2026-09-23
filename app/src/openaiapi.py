@@ -14,10 +14,21 @@ client = OpenAI()
 class Base(DeclarativeBase):
     pass
 
+class UserPersonal(Base):
+    __tablename__ = "user_personal"
+
+    user_id = sqlalchemy.Column("user_id", sqlalchemy.String, primary_key=True)
+    name = sqlalchemy.Column("user_name", sqlalchemy.String)
+    email = sqlalchemy.Column("email", sqlalchemy.String)
+    phone = sqlalchemy.Column("phone", sqlalchemy.String)
+    address = sqlalchemy.Column("address", sqlalchemy.String)
+    # TODO: validation of types
+
+
 class UserInfoTable(Base):
     __tablename__ = "user_info"
 
-    user_id = sqlalchemy.Column("user_id", sqlalchemy.BLOB, primary_key=True)
+    user_id = sqlalchemy.Column("user_id", sqlalchemy.String, primary_key=True)
     info = sqlalchemy.Column("skills", sqlalchemy.JSON)
     done_processing = sqlalchemy.Column("done_processing", sqlalchemy.Boolean)
 
