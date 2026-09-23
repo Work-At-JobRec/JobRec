@@ -1,3 +1,4 @@
+import traceback
 from openai import OpenAI
 from dotenv import load_dotenv
 from typing import Annotated
@@ -47,6 +48,10 @@ class Employment(BaseModel):
 
 
 class UserInfo(BaseModel):
+    name: str | None = Field(None, description="Applicant's full name, as it appears on the resume")
+    email: str | None = Field(None, description="Applicant's contact email address, if listed on the resume")
+    phone: str | None = Field(None, description="Applicant's phone number, if listed on the resume")
+    location: str | None = Field(None, description="Applicant's city and state (or region/country), if listed on the resume")
     skills: list[SkillRanking] = Field(
         ..., description="All skills that the applicant has any experience with."
     )
@@ -58,7 +63,12 @@ class UserInfo(BaseModel):
 
 
 def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
-    user_info = parse_resume(filename)
+    try:
+        user_info = parse_resume(filename)
+    except Exception:
+        traceback.print_exc()
+        user_info = None
+
     with Session(engine) as session:
 
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
@@ -69,7 +79,6 @@ def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
 
         if user_info is None:
             skill_ranking.done_processing = True
-            return
         else:
             # Deduplicate skills
             unique_skills = {}
@@ -108,9 +117,11 @@ def parse_resume(filename: str) -> UserInfo | None:
     response = client.responses.parse(
         model="gpt-5.2",
         instructions="""You are an HR manager who is an expert in reading and parsing resumes.
-        First, determine the user's employment history, project experience, education, and any linked social media presences. 
-        Then, determine what skills the applicant has from their PDF resume. 
-        Furthermore, rank their proficiency in each skill on a scale from 1-4, where 1 is basic familiarity, 2 is extensive amateur experience, 3 is professional or academic experience, and 4 is proven, long-term mastery.""",
+        First, extract the applicant's contact information: their full name, email address, phone number, and location (city/state or region), as listed on the resume.
+        Then, determine the user's employment history, project experience, education, and any linked social media presences.
+        Then, determine what skills the applicant has from their PDF resume.
+        Furthermore, rank their proficiency in each skill on a scale from 1-4, where 1 is basic familiarity, 2 is extensive amateur experience, 3 is professional or academic experience, and 4 is proven, long-term mastery.
+        If any piece of contact information is not present on the resume, leave it null rather than guessing.""",
         input=[
             {
                 "role": "user",

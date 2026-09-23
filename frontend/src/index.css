@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+}
+
+.avatar::before {
+  content: "";
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  background: #2b323d;
+  border-radius: 50%;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.avatar::after {
+  content: "";
+  position: absolute;
+  width: 84px;
+  height: 38px;
+  background: #2b323d;
+  border-radius: 36px 36px 14px 14px;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.spinner {
+  border: 10px solid #f7c6da;
+  border-top: 10px solid #ff2d8d;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
