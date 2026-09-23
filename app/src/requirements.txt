@@ -4,3 +4,6 @@ dotenv
 openai
 pydantic
 sqlalchemy
+pytest
+pypdf
+python-docx
