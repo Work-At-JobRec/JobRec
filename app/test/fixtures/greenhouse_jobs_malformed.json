@@ -1,0 +1,42 @@
+{
+  "jobs": [
+    {
+      "id": 5000001,
+      "title": "Backend Engineer",
+      "updated_at": "2026-09-12T13:25:25-04:00",
+      "first_published": "2026-09-03T13:30:34-04:00",
+      "absolute_url": "https://acme.com/jobs?gh_jid=5000001",
+      "location": {"name": "Remote"},
+      "company_name": "Acme Corp",
+      "content": "&lt;p&gt;Build reliable services.&lt;/p&gt;"
+    },
+    {
+      "id": 5000002,
+      "absolute_url": "https://acme.com/jobs?gh_jid=5000002",
+      "location": {"name": "Dublin"},
+      "company_name": "Acme Corp"
+    },
+    {
+      "id": 5000003,
+      "title": "Job With No Link",
+      "location": {"name": "Dublin"},
+      "company_name": "Acme Corp"
+    },
+    {
+      "id": 5000004,
+      "title": 123,
+      "absolute_url": "https://acme.com/jobs?gh_jid=5000004",
+      "company_name": "Acme Corp"
+    },
+    {
+      "id": 5000005,
+      "title": "Job With Wrong Location Shape",
+      "absolute_url": "https://acme.com/jobs?gh_jid=5000005",
+      "location": "Dublin",
+      "company_name": "Acme Corp"
+    }
+  ],
+  "meta": {
+    "total": 5
+  }
+}

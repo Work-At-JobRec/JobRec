@@ -10,6 +10,11 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
+mock_user = {"sub": "test|mockuser"}
+class mock_auth_server:
+    async def get_user(self, request: dict):
+        return mock_user
+
 # These MUST come after sys.path.insert(...)
 from app import app, allowed_file
 
@@ -50,13 +55,15 @@ def test_corrupted_pdf_upload_is_not_saved(tmp_path):
     fake_pdf = io.BytesIO(b"fake pdf contents")
 
     with patch("app.Thread"):
-        response = client.post(
-            "/upload",
-            data={
-                "resume": (fake_pdf, "test_resume.pdf")
-            },
-            content_type="multipart/form-data",
-        )
+        with patch("app.auth0") as mock_auth0:
+            mock_auth0.return_value = mock_auth_server()
+            response = client.post(
+                "/upload",
+                data={
+                    "resume": (fake_pdf, "test_resume.pdf")
+                },
+                content_type="multipart/form-data",
+            )
 
     uploaded_file = tmp_path / "test_resume.pdf"
 
@@ -74,13 +81,15 @@ def test_corrupted_docx_upload_is_not_saved(tmp_path):
     fake_docx = io.BytesIO(b"fake docx contents")
 
     with patch("app.Thread"):
-        response = client.post(
-            "/upload",
-            data={
-                "resume": (fake_docx, "test_resume.docx")
-            },
-            content_type="multipart/form-data",
-        )
+        with patch("app.auth0") as mock_auth0:
+            mock_auth0.return_value = mock_auth_server()
+            response = client.post(
+                "/upload",
+                data={
+                    "resume": (fake_docx, "test_resume.docx")
+                },
+                content_type="multipart/form-data",
+            )
 
     uploaded_file = tmp_path / "test_resume.docx"
 
@@ -102,17 +111,19 @@ def test_valid_pdf_upload_is_saved(tmp_path):
     )
 
     with open(resume_path, "rb") as resume_file:
-        with patch("app.Thread"):
-            response = client.post(
-                "/upload",
-                data={
-                    "resume": (
-                        resume_file,
-                        "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
-                    )
-                },
-                content_type="multipart/form-data",
-            )
+        with patch("app.auth0") as mock_auth0:
+            mock_auth0.return_value = mock_auth_server()
+            with patch("app.Thread"):
+                response = client.post(
+                    "/upload",
+                    data={
+                        "resume": (
+                            resume_file,
+                            "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+                        )
+                    },
+                    content_type="multipart/form-data",
+                )
 
     uploaded_file = (
         tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
@@ -136,17 +147,19 @@ def test_valid_docx_upload_is_saved(tmp_path):
     )
 
     with open(resume_path, "rb") as resume_file:
-        with patch("app.Thread"):
-            response = client.post(
-                "/upload",
-                data={
-                    "resume": (
-                        resume_file,
-                        "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
-                    )
-                },
-                content_type="multipart/form-data",
-            )
+        with patch("app.auth0") as mock_auth0:
+            mock_auth0.return_value = mock_auth_server()
+            with patch("app.Thread"):
+                response = client.post(
+                    "/upload",
+                    data={
+                        "resume": (
+                            resume_file,
+                            "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
+                        )
+                    },
+                    content_type="multipart/form-data",
+                )
 
     uploaded_file = (
         tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
@@ -163,14 +176,15 @@ def test_txt_upload_is_rejected(tmp_path):
     client = app.test_client()
 
     fake_txt = io.BytesIO(b"hello world")
-
-    response = client.post(
-        "/upload",
-        data={
-            "resume": (fake_txt, "resume.txt")
-        },
-        content_type="multipart/form-data",
-    )
+    with patch("app.auth0") as mock_auth0:
+        mock_auth0.return_value = mock_auth_server()
+        response = client.post(
+            "/upload",
+            data={
+                "resume": (fake_txt, "resume.txt")
+            },
+            content_type="multipart/form-data",
+        )
 
     assert not (tmp_path / "resume.txt").exists()
     
@@ -182,14 +196,15 @@ def test_png_upload_is_rejected(tmp_path):
     client = app.test_client()
 
     fake_png = io.BytesIO(b"hello world")
-
-    response = client.post(
-        "/upload",
-        data={
-            "resume": (fake_png, "resume.png")
-        },
-        content_type="multipart/form-data",
-    )
+    with patch("app.auth0") as mock_auth0:
+        mock_auth0.return_value = mock_auth_server()
+        response = client.post(
+            "/upload",
+            data={
+                "resume": (fake_png, "resume.png")
+            },
+            content_type="multipart/form-data",
+        )
 
     assert not (tmp_path / "resume.png").exists()    
     
@@ -199,8 +214,6 @@ def test_profile_displays_skills(tmp_path):
     test_db = tmp_path / "test_user_skills.db"
     test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
     Base.metadata.create_all(test_engine)
-
-    test_user_id = b"team 6"
 
     dummy_user_info = UserInfo(
         skills=[
@@ -221,7 +234,7 @@ def test_profile_displays_skills(tmp_path):
 
     with Session(test_engine) as session:
         user = UserInfoTable(
-            user_id=test_user_id,
+            user_id=mock_user.get("sub"),
             info=dummy_user_info.model_dump(),
             done_processing=True
         )
@@ -233,7 +246,9 @@ def test_profile_displays_skills(tmp_path):
     client = app.test_client()
 
     with patch("app.engine", test_engine):
-        response = client.get("/api/profile")  
+        with patch("app.auth0") as mock_auth0:
+            mock_auth0.return_value = mock_auth_server()
+            response = client.get("/api/profile")  
 
     assert response.status_code == 200
 
