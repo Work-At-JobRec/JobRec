@@ -1,7 +1,7 @@
 import os
 from os import environ as env
 from urllib.parse import urlparse
-from flask import Flask, flash, request, redirect, render_template, url_for, jsonify, Response
+from flask import Flask, flash, request, redirect, render_template, url_for, jsonify, Response, g
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
@@ -9,12 +9,8 @@ from openaiapi import UserInfoTable, update_skill_db, UserInfo, UserPersonal, Ba
 from threading import Thread
 from pypdf import PdfReader
 from docx import Document
-from auth0_server_python.auth_server.server_client import ServerClient
-from auth0_server_python.auth_types import LogoutOptions, StartInteractiveLoginOptions, StateData, TransactionData
-from auth0_server_python.store.abstract import AbstractDataStore
 from dotenv import load_dotenv
-import auth
-from auth import auth0
+from auth import require_auth, get_user_id
 
 load_dotenv()
 
@@ -26,7 +22,6 @@ os.makedirs(RESUME_FOLDER, exist_ok=True)
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = RESUME_FOLDER
 app.secret_key = "test"
-app.register_blueprint(auth.bp)
 
 mock_userid: str = "test|mockuser1"
 
@@ -43,29 +38,14 @@ if(env.get("DEV") is not None):
 
 Base.metadata.create_all(engine)
 
-@app.route('/onboarding', methods=["GET"])
-async def onboarding_page():
-    user = await auth0().get_user({"request": request})
-    if user is None:
-        return redirect(url_for("home"))
-    with Session(engine) as session:
-        stmt = select(UserInfoTable).where(UserInfoTable.user_id == user.get("sub"))
-        try:
-            _ = session.scalars(stmt).one()
-        except:
-            return render_template("onboarding.html")
-        return redirect(url_for("home"))
-    
 
-@app.route('/onboarding', methods=["POST"])
+@app.route('/api/onboarding', methods=["POST"])
+@require_auth
 async def complete_onboarding():
-
-    user = await auth0().get_user({"request": request})
-    if user is None:
-        return redirect(url_for("home"))
+    user_id = get_user_id()
     with Session(engine) as session:
-        new_user = UserInfoTable(user_id = user.get("sub"), info = '{}', done_processing = True)
-        new_user_personals = UserPersonal(user_id = user.get("sub"), name = request.form.get("name"), email = request.form.get("email"), phone = request.form.get("phone"), address = request.form.get("address"))
+        new_user = UserInfoTable(user_id = user_id, info = '{}', done_processing = True)
+        new_user_personals = UserPersonal(user_id = user_id, name = request.form.get("name"), email = request.form.get("email"), phone = request.form.get("phone"), address = request.form.get("address"))
         session.add(new_user)
         session.add(new_user_personals)
         session.commit()
@@ -73,24 +53,16 @@ async def complete_onboarding():
 
 #new home page
 @app.route('/')
+@require_auth
 async def home():
-    user = await auth0().get_user({"request": request})
-    if not (user is None):
-        with Session(engine) as session:
-            stmt = select(UserInfoTable).where(UserInfoTable.user_id == user.get("sub"))
-            try:
-                _ = session.scalars(stmt).one()
-            except:
-                return redirect(url_for("onboarding_page"))
-    return render_template("index.html", authenticated=not (user is None))
+    return Response(status=404)
 
 @app.route('/api/profile')
+@require_auth
 async def profile():
-    user = await auth0().get_user({"request": request})
-    if user is None:
-        return redirect(url_for("auth.login"))
+    user_id = get_user_id()
     with Session(engine) as session:
-        stmt = select(UserInfoTable).where(UserInfoTable.user_id == user.get("sub"))
+        stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
         try:
             user_info_raw = session.scalars(stmt).one()
         except:
@@ -101,13 +73,12 @@ async def profile():
     return jsonify(status="processing", user_info=None)
 
 @app.route("/api/personal_info")
+@require_auth
 async def personal_info_api():
-    user = await auth0().get_user({"request": request})
-    if user is None:
-        return Response(status=403)
+    user_id = get_user_id()
     with Session(engine) as session:
         stmt = select(UserPersonal).where(
-            UserPersonal.user_id == user.get("sub")
+            UserPersonal.user_id == user_id
         )
 
         user_info_raw = session.scalars(stmt).one_or_none()
@@ -144,10 +115,9 @@ def valid_resume_file(filepath):
     except Exception:
         return False
 @app.route('/upload', methods=['GET', 'POST'])
+@require_auth
 async def upload_file():
-    user = await auth0().get_user({"request": request})
-    if user is None:
-        return redirect(url_for("auth.login"))
+    user_id = get_user_id()
     if request.method == 'POST':
         # check if the post request has the file part
         if 'resume' not in request.files:
@@ -175,7 +145,7 @@ async def upload_file():
             # add empty user info to db if not already present
             with Session(engine) as session:
                 stmt = select(UserInfoTable).where(
-                    UserInfoTable.user_id == user.get("sub")
+                    UserInfoTable.user_id == user_id
                 )
                 try:
                     user_info = session.scalars(stmt).one()
@@ -184,7 +154,7 @@ async def upload_file():
                     return redirect(url_for("onboarding_page"))
                 p = Thread(
                     target=update_skill_db,
-                    args=[user.get("sub"), engine, filepath]
+                    args=[user_id, engine, filepath]
                 )
                 p.start()
                 print("finished scheduling process")
