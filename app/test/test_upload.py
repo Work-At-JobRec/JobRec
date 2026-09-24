@@ -14,6 +14,8 @@ sys.path.insert(0, SRC_DIR)
 mock_user = "test|mockuser"
 fake_headers = {"Authorization" : "Bearer 39"}
 
+patch()
+
 async def mock_verify_access_token(token):
     return {"sub": mock_user}
 
