@@ -57,7 +57,7 @@ def complete_onboarding():
             session.add(new_user)
             session.add(new_user_personals)
         session.commit()
-    return redirect(url_for("profile"))
+    return Response(status=200)
 
 #new home page
 @app.route('/')
@@ -150,8 +150,7 @@ def upload_file():
         # Check that the uploaded file is actually a valid PDF/DOCX
         if not valid_resume_file(filepath):
             os.remove(filepath)
-            flash('Uploaded resume is corrupted or invalid')
-            return redirect(url_for('profile'))
+            return Response(status=400)
         # add empty user info to db if not already present
         with Session(engine) as session:
             stmt = select(UserInfoTable).where(
@@ -161,7 +160,9 @@ def upload_file():
                 user_info = session.scalars(stmt).one()
                 user_info.done_processing = False
             except:
-                return redirect(url_for("onboarding_page"))
+                user_info = UserInfoTable(user_id = user_id, info = {}, done_processing = False)
+                session.add(user_info)
+            session.commit()
             p = Thread(
                 target=update_skill_db,
                 args=[user_id, engine, filepath]
@@ -171,6 +172,7 @@ def upload_file():
             # change made so when resumes upload it goes to the profile
             # instead of default title page
             return Response(status=200)
+    return Response(status=400)
 
 if __name__ == "__main__":
     url = urlparse(env.get("APP_BASE_URL"))
