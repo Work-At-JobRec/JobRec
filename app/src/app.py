@@ -84,7 +84,7 @@ async def home():
                 return redirect(url_for("onboarding_page"))
     return render_template("index.html", authenticated=not (user is None))
 
-@app.route('/profile')
+@app.route('/api/profile')
 async def profile():
     user = await auth0().get_user({"request": request})
     if user is None:
@@ -99,28 +99,6 @@ async def profile():
         user_info = UserInfo.model_validate(user_info_raw.info)
         return jsonify(status="done", user_info=user_info.model_dump())
     return jsonify(status="processing", user_info=None)
-
-@app.route('/api/profile')
-async def profile_api():
-    user = await auth0().get_user({"request": request})
-    if user is None:
-        return Response(status=403)
-    with Session(engine) as session:
-        stmt = select(UserInfoTable).where(
-            UserInfoTable.user_id == user.get("sub")
-        )
-
-        user_info_raw = session.scalars(stmt).one_or_none()
-
-        if user_info_raw is None:
-            return jsonify({"error": "User not found"}), 404
-
-        if not user_info_raw.done_processing:
-            return jsonify({"processing": True}), 202
-
-        user_info = UserInfo.model_validate(user_info_raw.info)
-
-        return jsonify(user_info.model_dump())
 
 @app.route("/api/personal_info")
 async def personal_info_api():

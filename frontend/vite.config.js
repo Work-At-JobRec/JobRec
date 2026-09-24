@@ -10,4 +10,5 @@ export default defineConfig({
       '/upload': 'http://localhost:5001',
     },
   },
+  envDir: "../"
 })

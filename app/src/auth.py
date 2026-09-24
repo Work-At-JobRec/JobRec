@@ -76,7 +76,7 @@ async def callback():
         await auth0().complete_interactive_login(
             url=request.url, store_options={"request": request},
         )
-        return redirect("/")
+        return redirect("http://localhost:5173/")
     except Exception:
         bp.logger.exception("Callback error")
         return "Something went wrong. Check server logs for details.", 400
