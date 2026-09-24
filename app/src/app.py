@@ -1,7 +1,7 @@
 import os
 from os import environ as env
 from urllib.parse import urlparse
-from flask import Flask, flash, request, redirect, render_template, url_for, jsonify, Response, g
+from flask import Flask, flash, request, redirect, render_template, url_for, jsonify, Response
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
@@ -41,25 +41,33 @@ Base.metadata.create_all(engine)
 
 @app.route('/api/onboarding', methods=["POST"])
 @require_auth
-async def complete_onboarding():
+def complete_onboarding():
     user_id = get_user_id()
     with Session(engine) as session:
-        new_user = UserInfoTable(user_id = user_id, info = '{}', done_processing = True)
-        new_user_personals = UserPersonal(user_id = user_id, name = request.form.get("name"), email = request.form.get("email"), phone = request.form.get("phone"), address = request.form.get("address"))
-        session.add(new_user)
-        session.add(new_user_personals)
+        stmt = select(UserPersonal).where(UserPersonal.user_id == user_id)
+        try:
+            user_info_raw = session.scalars(stmt).one()
+            user_info_raw.name = request.form.get("name")
+            user_info_raw.email = request.form.get("email")
+            user_info_raw.phone = request.form.get("phone")
+            user_info_raw.address = request.form.get("address")
+        except:
+            new_user = UserInfoTable(user_id = user_id, info = '{}', done_processing = True)
+            new_user_personals = UserPersonal(user_id = user_id, name = request.form.get("name"), email = request.form.get("email"), phone = request.form.get("phone"), address = request.form.get("address"))
+            session.add(new_user)
+            session.add(new_user_personals)
         session.commit()
     return redirect(url_for("profile"))
 
 #new home page
 @app.route('/')
 @require_auth
-async def home():
+def home():
     return Response(status=404)
 
 @app.route('/api/profile')
 @require_auth
-async def profile():
+def profile():
     user_id = get_user_id()
     with Session(engine) as session:
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
@@ -68,13 +76,16 @@ async def profile():
         except:
             return jsonify(status="empty", user_info=None)
     if user_info_raw.done_processing:
-        user_info = UserInfo.model_validate(user_info_raw.info)
-        return jsonify(status="done", user_info=user_info.model_dump())
+        try:
+            user_info = UserInfo.model_validate(user_info_raw.info)
+            return jsonify(status="done", user_info=user_info.model_dump())
+        except:
+            return jsonify(status="done", user_info=None)
     return jsonify(status="processing", user_info=None)
 
 @app.route("/api/personal_info")
 @require_auth
-async def personal_info_api():
+def personal_info_api():
     user_id = get_user_id()
     with Session(engine) as session:
         stmt = select(UserPersonal).where(
@@ -86,7 +97,7 @@ async def personal_info_api():
             return Response(status=400)
         res = dict(user_info_raw.__dict__)
         res.pop('_sa_instance_state')
-        return jsonify(res)
+        return jsonify(user_info=res)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -114,55 +125,52 @@ def valid_resume_file(filepath):
 
     except Exception:
         return False
-@app.route('/upload', methods=['GET', 'POST'])
+@app.route('/upload', methods=['POST'])
 @require_auth
-async def upload_file():
+def upload_file():
     user_id = get_user_id()
-    if request.method == 'POST':
-        # check if the post request has the file part
-        if 'resume' not in request.files:
-            flash('No file part')
-            return redirect(request.url)
-        print(request.files)
-        file = request.files['resume']
-        # If the user does not select a file, the browser submits an
-        # empty file without a filename.
-        if file.filename == '':
-            flash('No selected file')
-            return redirect(request.url)
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(
-                app.config['UPLOAD_FOLDER'],
-                filename
+    # check if the post request has the file part
+    if 'resume' not in request.files:
+        flash('No file part')
+        return redirect(request.url)
+    print(request.files)
+    file = request.files['resume']
+    # If the user does not select a file, the browser submits an
+    # empty file without a filename.
+    if file.filename == '':
+        flash('No selected file')
+        return redirect(request.url)
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(
+            app.config['UPLOAD_FOLDER'],
+            filename
+        )
+        file.save(filepath)
+        # Check that the uploaded file is actually a valid PDF/DOCX
+        if not valid_resume_file(filepath):
+            os.remove(filepath)
+            flash('Uploaded resume is corrupted or invalid')
+            return redirect(url_for('profile'))
+        # add empty user info to db if not already present
+        with Session(engine) as session:
+            stmt = select(UserInfoTable).where(
+                UserInfoTable.user_id == user_id
             )
-            file.save(filepath)
-            # Check that the uploaded file is actually a valid PDF/DOCX
-            if not valid_resume_file(filepath):
-                os.remove(filepath)
-                flash('Uploaded resume is corrupted or invalid')
-                return redirect(url_for('profile'))
-            # add empty user info to db if not already present
-            with Session(engine) as session:
-                stmt = select(UserInfoTable).where(
-                    UserInfoTable.user_id == user_id
-                )
-                try:
-                    user_info = session.scalars(stmt).one()
-                    user_info.done_processing = False
-                except:
-                    return redirect(url_for("onboarding_page"))
-                p = Thread(
-                    target=update_skill_db,
-                    args=[user_id, engine, filepath]
-                )
-                p.start()
-                print("finished scheduling process")
-                # change made so when resumes upload it goes to the profile
-                # instead of default title page
-                return redirect(url_for('profile'))
-
-    return redirect(url_for('home'))
+            try:
+                user_info = session.scalars(stmt).one()
+                user_info.done_processing = False
+            except:
+                return redirect(url_for("onboarding_page"))
+            p = Thread(
+                target=update_skill_db,
+                args=[user_id, engine, filepath]
+            )
+            p.start()
+            print("finished scheduling process")
+            # change made so when resumes upload it goes to the profile
+            # instead of default title page
+            return Response(status=200)
 
 if __name__ == "__main__":
     url = urlparse(env.get("APP_BASE_URL"))
