@@ -1,6 +1,8 @@
 import Navbar from "../components/Navbar.jsx";
+import { useAuth0 } from "@auth0/auth0-react";
 
 export default function Home() {
+  const { isAuthenticated, isLoading, user, loginWithRedirect, logout } = useAuth0();
   return (
     <div className="flex flex-col items-center min-h-screen text-center">
       <Navbar />
@@ -10,6 +12,13 @@ export default function Home() {
       </div>
       <div className="text-[15px] text-black">
         Sharvari Deshpande, Luna Brown, Luke McCartney, and Pranav Putta
+      </div>
+      <div>
+        {isLoading ? 
+          <div>loading...</div>          
+        : isAuthenticated ?<div >welcome, {user.name}</div>: <div>not logged in...
+        </div>
+        }
       </div>
     </div>
   );
