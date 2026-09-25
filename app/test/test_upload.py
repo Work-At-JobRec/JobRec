@@ -281,3 +281,78 @@ def test_profile_displays_skills(tmp_path):
     assert data["user_info"]["skills"][0]["proficiency_level"] == 4
     assert data["user_info"]["skills"][1]["skill_name"] == "C"
     assert data["user_info"]["skills"][1]["proficiency_level"] == 3
+
+@ignore_auth
+def test_persistence(tmp_path):
+    # disable automatic database clearing
+    if not (os.environ.get("DEV") is None):
+        os.environ.pop("DEV")
+
+    test_db = tmp_path / "test_user_info.db"
+    test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
+    Base.metadata.create_all(test_engine)
+
+    app.config["TESTING"] = True
+    client = app.test_client()
+    personal_data = {
+        "name": "Kanade Yoisaki",
+        "email": "k@gmail.com",
+        "address": "here",
+        "phone": "(555) 393-9393"
+    }
+    with patch("app.engine", test_engine):
+        response = client.post("/api/onboarding", data=personal_data, headers=fake_headers)
+
+    assert response.status_code == 200
+    # restart client
+    del(client)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    with patch("app.engine", test_engine):
+        response = client.get("/api/info", headers=fake_headers)
+
+    assert response.status_code == 200
+    data = UserInfo.model_validate(response.get_json().get("user_info"))
+    assert not (data is None)
+    assert data.location == personal_data.get("address")
+    assert data.location == personal_data.get("email")
+    assert data.location == personal_data.get("name")
+    assert data.location== personal_data.get("phone")
+
+
+@ignore_auth
+def test_api_returns_correct_personals(tmp_path):
+    test_db = tmp_path / "test_user_info.db"
+    test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
+    Base.metadata.create_all(test_engine)
+
+    with Session(test_engine) as session:
+        dummy_user_personal = UserInfo(
+            name = "Kanade Yoisaki", 
+            email = "k@gmail.com",
+            location = "N/A",
+            phone = "(555) 393-9393",
+            skills = [],
+            education = [],
+            projects = [],
+            socials = [],
+            employment_history = []
+        )
+
+        session.add(UserInfoTable(user_id = mock_user, info=dummy_user_personal.model_dump(), done_processing = True))
+        session.commit()
+
+        app.config["TESTING"] = True
+        client = app.test_client()
+
+        with patch("app.engine", test_engine):
+            response = client.get("/api/personal_info", headers=fake_headers)
+
+        assert response.status_code == 200
+
+        data = UserInfo.model_validate(response.get_json().get("user_info"))
+        assert not (data is None)
+        assert data.location == dummy_user_personal.location
+        assert data.email == dummy_user_personal.email
+        assert data.name == dummy_user_personal.name
+        assert data.phone == dummy_user_personal.phone

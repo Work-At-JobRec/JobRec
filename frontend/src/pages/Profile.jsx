@@ -162,18 +162,6 @@ export default function Profile() {
     }
   }, [accessToken]);
 
-  const fetchPersonal = useCallback(async () => {
-    try { 
-      const res = await fetch("/api/personal_info", {headers: {
-          Authorization: `Bearer ${accessToken}`
-        }});
-      const data = await res.json();
-      setUserpersonal(data.user_info ?? null);
-    } catch (err) {
-      console.error("Failed to fetch personal info", err);
-    }
-  }, [accessToken]);
-
   useEffect(() => {
     if (status === "empty") {
       window.location.href = "/onboarding"
@@ -183,7 +171,6 @@ export default function Profile() {
   useEffect(() => {
     if(accessToken){
       fetchProfile();
-      fetchPersonal();
     }
   }, [accessToken]);
 
@@ -215,7 +202,7 @@ export default function Profile() {
       <div className="w-full min-h-screen bg-[#f4f4f4]">
         <Navbar />
         <main className="grid md:grid-cols-[42%_58%] grid-cols-1 min-h-[calc(100vh-58px)] items-stretch">
-          <LeftPanel processing={processing} userInfo={userPersonal} onUpload={handleUpload} />
+          <LeftPanel processing={processing} userInfo={userInfo} onUpload={handleUpload} />
           {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} />}
         </main>
       </div>

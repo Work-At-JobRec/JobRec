@@ -5,7 +5,7 @@ from flask import Flask, flash, request, redirect, render_template, url_for, jso
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
-from openaiapi import UserInfoTable, update_skill_db, UserInfo, UserPersonal, Base
+from openaiapi import UserInfoTable, update_skill_db, UserInfo, Base
 from threading import Thread
 from pypdf import PdfReader
 from docx import Document
@@ -33,8 +33,6 @@ Base.metadata.create_all(engine)
 if(env.get("DEV") is not None):
     with Session(engine) as session:
         session.execute(delete(UserInfoTable))
-        session.execute(delete(UserPersonal))
-        session.commit()
 
 Base.metadata.create_all(engine)
 
@@ -44,18 +42,29 @@ Base.metadata.create_all(engine)
 def complete_onboarding():
     user_id = get_user_id()
     with Session(engine) as session:
-        stmt = select(UserPersonal).where(UserPersonal.user_id == user_id)
+        stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
         try:
             user_info_raw = session.scalars(stmt).one()
-            user_info_raw.name = request.form.get("name")
-            user_info_raw.email = request.form.get("email")
-            user_info_raw.phone = request.form.get("phone")
-            user_info_raw.address = request.form.get("address")
+            user_info = UserInfo.model_validate(user_info_raw.info)
+            user_info.name = request.form.get("name")
+            user_info.email = request.form.get("email")
+            user_info.phone = request.form.get("phone")
+            user_info.location = request.form.get("address")
+            user_info_raw.info = user_info.model_dump()
         except:
-            new_user = UserInfoTable(user_id = user_id, info = '{}', done_processing = True)
-            new_user_personals = UserPersonal(user_id = user_id, name = request.form.get("name"), email = request.form.get("email"), phone = request.form.get("phone"), address = request.form.get("address"))
+            new_user_personals = UserInfo(
+                name=request.form.get("name"),
+                email = request.form.get("email"),
+                phone = request.form.get("phone"),
+                location = request.form.get("address"),
+                skills=[],
+                education=[],
+                projects=[],
+                socials=[],
+                employment_history=[]
+            )
+            new_user = UserInfoTable(user_id = user_id, info = new_user_personals.model_dump(), done_processing = True)
             session.add(new_user)
-            session.add(new_user_personals)
         session.commit()
     return Response(status=200)
 
@@ -82,22 +91,6 @@ def profile():
         except:
             return jsonify(status="done", user_info=None)
     return jsonify(status="processing", user_info=None)
-
-@app.route("/api/personal_info")
-@require_auth
-def personal_info_api():
-    user_id = get_user_id()
-    with Session(engine) as session:
-        stmt = select(UserPersonal).where(
-            UserPersonal.user_id == user_id
-        )
-
-        user_info_raw = session.scalars(stmt).one_or_none()
-        if user_info_raw is None:
-            return Response(status=400)
-        res = dict(user_info_raw.__dict__)
-        res.pop('_sa_instance_state')
-        return jsonify(user_info=res)
 
 def allowed_file(filename):
     return '.' in filename and \
