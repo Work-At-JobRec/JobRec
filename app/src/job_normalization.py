@@ -122,12 +122,14 @@ def normalize_url(url: Optional[str]) -> str:
 def normalize_listing(listing: JobListing) -> JobListing:
     """Return a normalized copy of a listing. The listing passed in is not modified."""
     location = _collapse_whitespace(listing.location) if listing.location else ""
+    pay = _collapse_whitespace(listing.pay) if listing.pay else ""
     return listing.model_copy(update={
         "title": _collapse_whitespace(listing.title),
         "company_name": _collapse_whitespace(listing.company_name),
         "location": location or None,
         "description": clean_text(listing.description),
         "application_url": normalize_url(listing.application_url),
+        "pay": pay or None,
     })
 
 

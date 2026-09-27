@@ -207,3 +207,15 @@ def test_normalize_listings_maps_all_in_order():
     result = normalize_listings([make_listing(title=" A "), make_listing(title=" B ")])
 
     assert [listing.title for listing in result] == ["A", "B"]
+
+
+# Extra whitespace inside a pay value is removed; a blank pay value means no pay
+def test_pay_whitespace_collapsed_and_blank_becomes_none():
+    assert normalize_listing(make_listing(pay="  USD  100,000-120,000 \n(Base) ")).pay == "USD 100,000-120,000 (Base)"
+    assert normalize_listing(make_listing(pay="   ")).pay is None
+    assert normalize_listing(make_listing(pay=None)).pay is None
+
+
+# Status passes through normalization unchanged
+def test_status_is_preserved():
+    assert normalize_listing(make_listing(status="closed")).status == "closed"

@@ -88,3 +88,21 @@ def test_json_round_trip_preserves_values():
     restored = JobListing.model_validate_json(listing.model_dump_json())
 
     assert restored == listing
+
+
+# Pay is optional and a listing is open unless a scraper says otherwise
+def test_pay_defaults_to_none_and_status_to_open():
+    listing = make_listing()
+
+    assert listing.pay is None
+    assert listing.status == "open"
+
+
+# Pay and status survive a JSON round trip
+def test_pay_and_status_round_trip():
+    listing = make_listing(pay="USD 100,000-120,000 (Base)", status="closed")
+
+    restored = JobListing.model_validate_json(listing.model_dump_json())
+
+    assert restored.pay == "USD 100,000-120,000 (Base)"
+    assert restored.status == "closed"
