@@ -4,15 +4,13 @@ from dotenv import load_dotenv
 from typing import Annotated
 from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import select
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import Session
 import sqlalchemy
+from db import Base  # noqa: F401  (re-exported: app.py and tests import Base from here)
 
 _ = load_dotenv()
 
 client = OpenAI()
-
-class Base(DeclarativeBase):
-    pass
 
 class UserPersonal(Base):
     __tablename__ = "user_personal"

@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
 from openaiapi import UserInfoTable, update_skill_db, UserInfo, UserPersonal, Base
+from job_store import JobListingTable  # noqa: F401  (registers the job_listings table before create_all below)
 from threading import Thread
 from pypdf import PdfReader
 from docx import Document
