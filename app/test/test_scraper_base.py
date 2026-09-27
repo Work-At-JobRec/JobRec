@@ -199,3 +199,29 @@ def test_build_listings_logs_warning_with_source_and_raw_id(caplog):
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
     assert "dummy" in warnings[0] and "42" in warnings[0]
+
+
+# --- POST requests (#67) ---
+
+# A successful POST returns the decoded JSON body and sends the given JSON payload
+def test_post_json_sends_payload_and_returns_decoded_body():
+    session = make_session(payload={"total": 0, "jobPostings": []})
+    session.post.return_value = session.get.return_value
+
+    result = DummyScraper(session=session)._post_json(URL, {"offset": 0}, timeout=3)
+
+    assert result == {"total": 0, "jobPostings": []}
+    session.post.assert_called_once_with(URL, json={"offset": 0}, timeout=3)
+
+
+# A failed POST becomes a ScraperRequestError with the URL, logged once
+def test_post_json_failure_raises_scraper_request_error(caplog):
+    caplog.set_level(logging.ERROR, logger="scraper_base")
+    session = Mock()
+    session.post.side_effect = requests.Timeout("timed out")
+
+    with pytest.raises(ScraperRequestError) as excinfo:
+        DummyScraper(session=session)._post_json(URL, {"offset": 0})
+
+    assert excinfo.value.url == URL
+    assert len([r for r in caplog.records if r.levelno == logging.ERROR]) == 1

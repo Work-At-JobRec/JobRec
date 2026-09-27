@@ -53,8 +53,15 @@ class BaseScraper(ABC):
         are logged once with the source and URL, then raised as ScraperRequestError so
         the caller can move on to the next source instead of crashing.
         """
+        return self._request_json(url, lambda: self.session.get(url, params=params, timeout=timeout))
+
+    def _post_json(self, url: str, payload: dict, timeout: float = DEFAULT_TIMEOUT) -> Any:
+        """POST a JSON payload and return the decoded JSON body, with the same error handling as _get_json."""
+        return self._request_json(url, lambda: self.session.post(url, json=payload, timeout=timeout))
+
+    def _request_json(self, url: str, send: Callable[[], Any]) -> Any:
         try:
-            response = self.session.get(url, params=params, timeout=timeout)
+            response = send()
             response.raise_for_status()
             return response.json()
         except (requests.RequestException, ValueError) as exc:

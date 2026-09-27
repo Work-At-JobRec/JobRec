@@ -1,0 +1,24 @@
+{
+  "jobPostingInfo": {
+    "id": "d89c00d78694103f71f490a334520000",
+    "title": "Senior Solutions Architect, Agentic AI",
+    "jobDescription": "<p>Acme is seeking a dynamic and experienced Generative AI Solution Architect.</p><ul><li>Design agentic systems.</li></ul>",
+    "location": "India, Gurugram",
+    "postedOn": "Posted Today",
+    "startDate": "2026-09-28",
+    "timeType": "Full time",
+    "jobReqId": "JR2026267",
+    "jobPostingId": "d89c00d78694103f71f490a334520001",
+    "jobPostingSiteId": "AcmeExternalCareerSite",
+    "country": {"descriptor": "India", "id": "c4f78be1a8f14da0ab49ce1162348a5e"},
+    "canApply": true,
+    "posted": true,
+    "includeResumeParsing": true,
+    "jobRequisitionLocation": {"descriptor": "India, Gurugram"},
+    "externalUrl": "https://acme.wd5.myworkdayjobs.com/AcmeExternalCareerSite/job/India-Gurugram",
+    "questionnaireId": null
+  },
+  "hiringOrganization": {"name": "Acme Corp", "url": "https://acme.wd5.myworkdayjobs.com/AcmeExternalCareerSite"},
+  "similarJobs": [],
+  "userAuthenticated": false
+}

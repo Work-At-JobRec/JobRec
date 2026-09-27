@@ -20,6 +20,7 @@ from job_sources import DEFAULT_SOURCES_PATH, JobSource, build_scraper, load_sou
 from job_store import count_listings, list_listings  # noqa: E402
 from lever_scraper import LeverScraper  # noqa: E402
 from scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
+from workday_scraper import WorkdayScraper  # noqa: E402
 
 
 @pytest.fixture
@@ -100,11 +101,14 @@ def test_load_sources_rejects_missing_id(tmp_path):
 def test_build_scraper_constructs_the_right_type():
     greenhouse = build_scraper(JobSource(scraper="greenhouse", id="acme", company_name="Acme"))
     lever = build_scraper(JobSource(scraper="lever", id="beta"))
+    workday = build_scraper(JobSource(scraper="workday", id="acme.wd5.myworkdayjobs.com/AcmeCareers", company_name="Acme"))
 
     assert isinstance(greenhouse, GreenhouseScraper)
     assert greenhouse.board_token == "acme" and greenhouse.company_name == "Acme"
     assert isinstance(lever, LeverScraper)
     assert lever.company == "beta" and lever.company_name is None
+    assert isinstance(workday, WorkdayScraper)
+    assert workday.site == "AcmeCareers" and workday.company_name == "Acme"
 
 
 # --- scraping every source ---
