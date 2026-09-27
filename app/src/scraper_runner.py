@@ -10,16 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 def fetch_all(scrapers: Iterable[BaseScraper]) -> list[JobListing]:
-    """Fetch jobs from every scraper and return the combined listings in scraper order.
+    """Fetch the open jobs from every scraper and return the combined listings in scraper order.
 
-    A source that cannot be reached is skipped (the failed request has already been
-    logged with its URL). Any other unexpected error from a scraper is logged with
-    its traceback and skipped as well, so a single bad source never ends the run.
+    Listings that no longer accept applicants are left out. A source that cannot be
+    reached is skipped (the failed request has already been logged with its URL).
+    Any other unexpected error from a scraper is logged with its traceback and
+    skipped as well, so a single bad source never ends the run.
     """
     listings: list[JobListing] = []
     for scraper in scrapers:
         try:
-            listings.extend(scraper.fetch_jobs())
+            listings.extend(scraper.fetch_open_jobs())
         except ScraperRequestError:
             continue
         except Exception:
