@@ -3,7 +3,8 @@ import os
 import sys
 from unittest.mock import patch
 from functools import wraps
-
+from app import app
+from sqlalchemy import delete
 
 # Lets this test import files from app/src
 SRC_DIR = os.path.abspath(
@@ -65,7 +66,7 @@ def test_jpg_is_not_allowed():
 # Tests if a corrupted/dummy PDF resume is rejected and not saved
 @ignore_auth
 def test_corrupted_pdf_upload_is_not_saved(tmp_path):
-    from app import app
+    
     app.config["TESTING"] = True
     app.config["UPLOAD_FOLDER"] = str(tmp_path)
 
@@ -292,6 +293,9 @@ def test_persistence(tmp_path):
     test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
     Base.metadata.create_all(test_engine)
 
+    with Session(test_engine) as session:
+            session.execute(delete(UserInfoTable))
+
     app.config["TESTING"] = True
     client = app.test_client()
     personal_data = {
@@ -309,15 +313,15 @@ def test_persistence(tmp_path):
     app.config["TESTING"] = True
     client = app.test_client()
     with patch("app.engine", test_engine):
-        response = client.get("/api/info", headers=fake_headers)
+        response = client.get("/api/profile", headers=fake_headers)
 
     assert response.status_code == 200
     data = UserInfo.model_validate(response.get_json().get("user_info"))
     assert not (data is None)
     assert data.location == personal_data.get("address")
-    assert data.location == personal_data.get("email")
-    assert data.location == personal_data.get("name")
-    assert data.location== personal_data.get("phone")
+    assert data.email == personal_data.get("email")
+    assert data.name == personal_data.get("name")
+    assert data.phone == personal_data.get("phone")
 
 
 @ignore_auth
@@ -346,7 +350,7 @@ def test_api_returns_correct_personals(tmp_path):
         client = app.test_client()
 
         with patch("app.engine", test_engine):
-            response = client.get("/api/personal_info", headers=fake_headers)
+            response = client.get("/api/profile", headers=fake_headers)
 
         assert response.status_code == 200
 
