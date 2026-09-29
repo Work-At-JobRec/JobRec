@@ -1,4 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+
+const navLinkClass =
+  "text-[28px] font-bold justify-self-center text-white no-underline hover:text-[#E75A8F] transition-colors";
 
 export default function Navbar() {
   return (
@@ -9,18 +12,15 @@ export default function Navbar() {
       >
         JobRec
       </Link>
-      <span className="text-[28px] font-bold justify-self-center opacity-50 cursor-default hover:text-[#E75A8F] transition-colors">
+      <NavLink to="/jobs" className={navLinkClass}>
         Jobs
-      </span>
+      </NavLink>
       <span className="text-[28px] font-bold justify-self-center opacity-50 cursor-default hover:text-[#E75A8F] transition-colors">
         Search
       </span>
-      <Link
-        to="/profile"
-        className="text-[28px] font-bold justify-self-center text-white hover:text-[#E75A8F] transition-colors"
-      >
+      <NavLink to="/profile" className={navLinkClass}>
         Profile
-      </Link>
+      </NavLink>
     </header>
   );
 }

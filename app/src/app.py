@@ -15,6 +15,7 @@ from auth0_server_python.store.abstract import AbstractDataStore
 from dotenv import load_dotenv
 import auth
 from auth import auth0
+from jobs import get_jobs, get_job
 
 load_dotenv()
 
@@ -138,6 +139,17 @@ async def personal_info_api():
         res = dict(user_info_raw.__dict__)
         res.pop('_sa_instance_state')
         return jsonify(res)
+
+@app.route('/api/jobs')
+def jobs_api():
+    return jsonify(get_jobs())
+
+@app.route('/api/jobs/<job_id>')
+def job_detail_api(job_id):
+    job = get_job(job_id)
+    if job is None:
+        return jsonify(error="Job not found"), 404
+    return jsonify(job)
 
 def allowed_file(filename):
     return '.' in filename and \
