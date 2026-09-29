@@ -37,6 +37,15 @@ SAMPLE_LISTINGS = [
         posted_at=_now - timedelta(days=4),
         source_job_id="2",
     ),
+    JobListing(
+        title="Designer",
+        company_name="ACME Corporation",
+        location="West Lafayette, IN",
+        description="Design clear, friendly interfaces for our customer-facing apps",
+        source="sample",
+        application_url="https://example.com/jobs/3",
+        source_job_id="3",
+    ),
 ]
 
 # Placeholder values for fields JobListing doesn't have, keyed by job id.
@@ -61,6 +70,16 @@ SAMPLE_MATCHES = {
             {"text": "Bachelors degree in", "skill": "statistics", "met": False},
             {"text": "Ability to work with", "skill": "Python", "met": True},
             {"text": "Experience with", "skill": "SQL", "met": True},
+        ],
+    },
+    "sample-3": {
+        "jobType": "Full Time",
+        "salary": "60k/yr",
+        "compatibility": 20,
+        "requirements": [
+            {"text": "Portfolio of work in", "skill": "UI/UX design", "met": False},
+            {"text": "Experience with", "skill": "Figma", "met": False},
+            {"text": "Ability to work with", "skill": "HTML/CSS", "met": True},
         ],
     },
 }

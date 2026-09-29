@@ -57,3 +57,12 @@ export function ChevronDownIcon({ className = "w-4 h-4" }) {
     </svg>
   );
 }
+
+export function SearchIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+      <circle cx="10" cy="10" r="6.5" />
+      <path d="m15 15 6 6" strokeLinecap="round" />
+    </svg>
+  );
+}

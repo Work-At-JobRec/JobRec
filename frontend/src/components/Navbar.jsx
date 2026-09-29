@@ -15,9 +15,9 @@ export default function Navbar() {
       <NavLink to="/jobs" className={navLinkClass}>
         Jobs
       </NavLink>
-      <span className="text-[28px] font-bold justify-self-center opacity-50 cursor-default hover:text-[#E75A8F] transition-colors">
+      <NavLink to="/search" className={navLinkClass}>
         Search
-      </span>
+      </NavLink>
       <NavLink to="/profile" className={navLinkClass}>
         Profile
       </NavLink>
