@@ -4,15 +4,14 @@ from dotenv import load_dotenv
 from typing import Annotated
 from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import select
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import Session
 import sqlalchemy
+from db import Base  # noqa: F401  (re-exported: app.py and tests import Base from here)
 
 _ = load_dotenv()
 
 client = OpenAI()
 
-class Base(DeclarativeBase):
-    pass
 
 class UserInfoTable(Base):
     __tablename__ = "user_info"
@@ -20,6 +19,7 @@ class UserInfoTable(Base):
     user_id = sqlalchemy.Column("user_id", sqlalchemy.String, primary_key=True)
     info = sqlalchemy.Column("skills", sqlalchemy.JSON)
     done_processing = sqlalchemy.Column("done_processing", sqlalchemy.Boolean)
+
 
 class SkillRanking(BaseModel):
     skill_name: str = Field(
@@ -33,33 +33,63 @@ class SkillRanking(BaseModel):
         description="Numerical ranking of an applicant's proficiency in this skill from 1-4, where 1 is basic familiarity, 2 is extensive amateur experience, 3 is professional or academic experience, and 4 is proven, long-term mastery.",
     )
 
+
 class Education(BaseModel):
     school: str = Field(..., description="School that the degree was earned from")
-    degree: str = Field(..., description="Degree level and field of study achieved from this university (e.g. bachelor's in art history). Do not include GPA.")
+    degree: str = Field(
+        ...,
+        description="Degree level and field of study achieved from this university (e.g. bachelor's in art history). Do not include GPA.",
+    )
+
 
 class Social(BaseModel):
-    platform: str = Field(..., description="Name of platform where this account is hosted")
-    url: str = Field(..., description="Full URL of the user's account on this platform, including hostname")
+    platform: str = Field(
+        ..., description="Name of platform where this account is hosted"
+    )
+    url: str = Field(
+        ...,
+        description="Full URL of the user's account on this platform, including hostname",
+    )
+
 
 class Employment(BaseModel):
-    company_name: str = Field(..., description="Name of the company where the user worked")
+    company_name: str = Field(
+        ..., description="Name of the company where the user worked"
+    )
     role: str = Field(..., description="User's role at the company")
 
 
-
 class UserInfo(BaseModel):
-    name: str | None = Field(None, description="Applicant's full name, as it appears on the resume")
-    email: str | None = Field(None, description="Applicant's contact email address, if listed on the resume")
-    phone: str | None = Field(None, description="Applicant's phone number, if listed on the resume")
-    location: str | None = Field(None, description="Applicant's city and state (or region/country), if listed on the resume")
+    name: str | None = Field(
+        None, description="Applicant's full name, as it appears on the resume"
+    )
+    email: str | None = Field(
+        None, description="Applicant's contact email address, if listed on the resume"
+    )
+    phone: str | None = Field(
+        None, description="Applicant's phone number, if listed on the resume"
+    )
+    location: str | None = Field(
+        None,
+        description="Applicant's city and state (or region/country), if listed on the resume",
+    )
     skills: list[SkillRanking] = Field(
         ..., description="All skills that the applicant has any experience with."
     )
-    education: list[Education] = Field(..., description="All education experience the applicant has")
-    projects: list[str] = Field(..., description="Names of all projects the user has experience with (do not include other information)")
-    socials: list[Social] = Field(..., description="All personal (not organizational) social media included in the user's resume")
-    employment_history: list[Employment] = Field(..., description="All previous work experience of the user")
-
+    education: list[Education] = Field(
+        ..., description="All education experience the applicant has"
+    )
+    projects: list[str] = Field(
+        ...,
+        description="Names of all projects the user has experience with (do not include other information)",
+    )
+    socials: list[Social] = Field(
+        ...,
+        description="All personal (not organizational) social media included in the user's resume",
+    )
+    employment_history: list[Employment] = Field(
+        ..., description="All previous work experience of the user"
+    )
 
 
 def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
@@ -90,11 +120,14 @@ def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
                     unique_skills[normalized_name] = skill
                 else:
                     # Keep whichever duplicate has the higher proficiency
-                    if skill.proficiency_level > unique_skills[normalized_name].proficiency_level:
+                    if (
+                        skill.proficiency_level
+                        > unique_skills[normalized_name].proficiency_level
+                    ):
                         unique_skills[normalized_name] = skill
 
             user_info.skills = list(unique_skills.values())
-            
+
             unique_socials = {}
             for s in user_info.socials:
                 unique_socials[s.platform.lower()] = s
