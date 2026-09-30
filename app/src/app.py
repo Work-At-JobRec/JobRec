@@ -15,6 +15,9 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
 from openaiapi import UserInfoTable, update_skill_db, UserInfo, Base, update_user_info
+from job_store import (
+    JobListingTable,
+)
 from threading import Thread
 from pypdf import PdfReader
 from docx import Document
@@ -49,6 +52,7 @@ if env.get("DEV") is not None:
         session.execute(delete(UserInfoTable))
 
 Base.metadata.create_all(engine)
+
 
 
 # Given a user, their search preferences, and a pagination number, return the next page of job search results
@@ -146,8 +150,7 @@ def get_candidate_percentile():
 def prune_old_jobs():
     # TODO: ensure user is admin, then prune
     raise NotImplementedError
-
-
+   
 @app.route("/api/onboarding", methods=["POST"])
 @require_auth
 def complete_onboarding():

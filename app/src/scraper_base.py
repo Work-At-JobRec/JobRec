@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterable, Optional
 import requests
 
 from job_listing import JobListing
+from job_validation import only_open_listings
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,11 @@ class BaseScraper(ABC):
 
     @abstractmethod
     def fetch_jobs(self) -> list[JobListing]:
-        """Retrieve every currently available job from the source as JobListing objects."""
+        """Retrieve every job the source reports, each with its status, as JobListing objects."""
+
+    def fetch_open_jobs(self) -> list[JobListing]:
+        """Retrieve only the jobs that still accept applicants. This is what the application consumes."""
+        return only_open_listings(self.fetch_jobs())
 
     def _get_json(self, url: str, params: Optional[dict] = None, timeout: float = DEFAULT_TIMEOUT) -> Any:
         """GET a URL and return its decoded JSON body.
@@ -48,8 +53,15 @@ class BaseScraper(ABC):
         are logged once with the source and URL, then raised as ScraperRequestError so
         the caller can move on to the next source instead of crashing.
         """
+        return self._request_json(url, lambda: self.session.get(url, params=params, timeout=timeout))
+
+    def _post_json(self, url: str, payload: dict, timeout: float = DEFAULT_TIMEOUT) -> Any:
+        """POST a JSON payload and return the decoded JSON body, with the same error handling as _get_json."""
+        return self._request_json(url, lambda: self.session.post(url, json=payload, timeout=timeout))
+
+    def _request_json(self, url: str, send: Callable[[], Any]) -> Any:
         try:
-            response = self.session.get(url, params=params, timeout=timeout)
+            response = send()
             response.raise_for_status()
             return response.json()
         except (requests.RequestException, ValueError) as exc:

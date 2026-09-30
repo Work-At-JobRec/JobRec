@@ -47,3 +47,9 @@ class JobListing(BaseModel):
         None,
         description="Source-specific job identifier, stored as a string so it is comparable across sources",
     )
+    pay: Optional[str] = Field(
+        None, description='Human-readable pay information as published by the source, e.g. "USD 100,000-120,000 (Base)"'
+    )
+    status: str = Field(
+        "open", description='Whether the listing still accepts applicants: "open" or "closed"'
+    )
