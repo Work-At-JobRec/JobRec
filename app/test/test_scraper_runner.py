@@ -82,3 +82,30 @@ def test_fetch_all_returns_empty_when_every_scraper_fails():
 # No scrapers means no listings
 def test_fetch_all_with_no_scrapers_returns_empty_list():
     assert fetch_all([]) == []
+
+
+# --- only open listings (#66) ---
+
+class MixedStatusScraper(BaseScraper):
+    source_name = "mixed"
+
+    def __init__(self):
+        pass
+
+    def fetch_jobs(self) -> list[JobListing]:
+        return [
+            make_listing(self.source_name, "Open"),
+            make_listing(self.source_name, "Closed").model_copy(update={"status": "closed"}),
+        ]
+
+
+# Closed listings reported by a scraper are left out of the combined result
+def test_fetch_all_drops_closed_listings():
+    jobs = fetch_all([MixedStatusScraper(), WorkingScraper("b", ["B1"])])
+
+    assert [job.title for job in jobs] == ["Open", "B1"]
+
+
+# The base class offers the open-only view to every scraper without extra code
+def test_fetch_open_jobs_is_available_on_any_scraper():
+    assert [job.title for job in MixedStatusScraper().fetch_open_jobs()] == ["Open"]

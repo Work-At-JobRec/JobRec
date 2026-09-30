@@ -69,3 +69,17 @@ def filter_valid_listings(listings: Iterable[JobListing]) -> list[JobListing]:
     if len(valid) != total:
         logger.info("Rejected %d of %d scraped job listings", total - len(valid), total)
     return valid
+
+
+def only_open_listings(listings: Iterable[JobListing]) -> list[JobListing]:
+    """Keep only listings that still accept applicants, in order. Logs how many closed ones were dropped."""
+    kept = []
+    dropped = 0
+    for listing in listings:
+        if listing.status == "open":
+            kept.append(listing)
+        else:
+            dropped += 1
+    if dropped:
+        logger.info("Dropped %d closed job listing(s); %d open listing(s) kept", dropped, len(kept))
+    return kept

@@ -1,0 +1,51 @@
+{
+  "jobs": [
+    {
+      "id": 6000001,
+      "title": "Open Role One",
+      "absolute_url": "https://acme.com/jobs?gh_jid=6000001",
+      "location": {"name": "Dublin"},
+      "company_name": "Acme Corp",
+      "application_deadline": null,
+      "content": "&lt;p&gt;Still hiring.&lt;/p&gt;"
+    },
+    {
+      "id": 6000002,
+      "title": "Closed Role One",
+      "absolute_url": "https://acme.com/jobs?gh_jid=6000002",
+      "location": {"name": "Dublin"},
+      "company_name": "Acme Corp",
+      "application_deadline": "2026-02-01T00:00:00Z",
+      "content": "&lt;p&gt;Applications closed.&lt;/p&gt;"
+    },
+    {
+      "id": 6000003,
+      "title": "Open Role Two",
+      "absolute_url": "https://acme.com/jobs?gh_jid=6000003",
+      "location": {"name": "Remote"},
+      "company_name": "Acme Corp",
+      "application_deadline": "2027-01-01T00:00:00Z",
+      "content": "&lt;p&gt;Deadline next year.&lt;/p&gt;"
+    },
+    {
+      "id": 6000004,
+      "title": "Closed Role Two",
+      "absolute_url": "https://acme.com/jobs?gh_jid=6000004",
+      "location": {"name": "Remote"},
+      "company_name": "Acme Corp",
+      "application_deadline": "2026-09-01T12:00:00-04:00",
+      "content": "&lt;p&gt;Applications closed.&lt;/p&gt;"
+    },
+    {
+      "id": 6000005,
+      "title": "Open Role Three",
+      "absolute_url": "https://acme.com/jobs?gh_jid=6000005",
+      "location": {"name": "London"},
+      "company_name": "Acme Corp",
+      "content": "&lt;p&gt;No deadline given.&lt;/p&gt;"
+    }
+  ],
+  "meta": {
+    "total": 5
+  }
+}

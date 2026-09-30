@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterable, Optional
 import requests
 
 from job_listing import JobListing
+from job_validation import only_open_listings
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,11 @@ class BaseScraper(ABC):
 
     @abstractmethod
     def fetch_jobs(self) -> list[JobListing]:
-        """Retrieve every currently available job from the source as JobListing objects."""
+        """Retrieve every job the source reports, each with its status, as JobListing objects."""
+
+    def fetch_open_jobs(self) -> list[JobListing]:
+        """Retrieve only the jobs that still accept applicants. This is what the application consumes."""
+        return only_open_listings(self.fetch_jobs())
 
     def _get_json(self, url: str, params: Optional[dict] = None, timeout: float = DEFAULT_TIMEOUT) -> Any:
         """GET a URL and return its decoded JSON body.

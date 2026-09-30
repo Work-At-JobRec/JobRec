@@ -91,3 +91,13 @@ def test_pipeline_continues_past_unreachable_scraper(engine):
 
     assert result.inserted == 1
     assert count_listings(engine) == 1
+
+
+# A listing that no longer accepts applicants is never stored
+def test_pipeline_does_not_store_closed_listings(engine):
+    scraper = FixedScraper([raw_listing(), raw_listing(source_job_id="2", status="closed")])
+
+    result = run_scrape_pipeline(engine, [scraper])
+
+    assert result.inserted == 1
+    assert [job.source_job_id for job in list_listings(engine)] == ["1"]

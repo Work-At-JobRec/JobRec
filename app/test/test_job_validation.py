@@ -9,7 +9,7 @@ SRC_DIR = os.path.abspath(
 sys.path.insert(0, SRC_DIR)
 
 from job_listing import JobListing  # noqa: E402
-from job_validation import filter_valid_listings, validate_listing  # noqa: E402
+from job_validation import filter_valid_listings, only_open_listings, validate_listing  # noqa: E402
 
 
 def make_listing(**overrides) -> JobListing:
@@ -156,3 +156,39 @@ def test_filter_accepts_generator_and_empty_input():
 
     assert len(filter_valid_listings(generated)) == 1
     assert filter_valid_listings([]) == []
+
+
+# --- open listings only (#66) ---
+
+# Only listings that still accept applicants are kept, in their original order
+def test_only_open_listings_drops_closed_ones():
+    open_one = make_listing(title="Open one", status="open")
+    closed = make_listing(title="Closed", status="closed")
+    open_two = make_listing(title="Open two")
+
+    assert only_open_listings([open_one, closed, open_two]) == [open_one, open_two]
+
+
+# Dropped listings are counted in the log so a source that is all closed is noticeable
+def test_only_open_listings_logs_how_many_were_dropped(caplog):
+    caplog.set_level(logging.INFO, logger="job_validation")
+
+    only_open_listings([make_listing(status="closed"), make_listing(status="closed"), make_listing()])
+
+    messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert any("2" in m and "closed" in m for m in messages)
+
+
+# Nothing is logged and nothing changes when every listing is open
+def test_only_open_listings_is_quiet_when_all_open(caplog):
+    caplog.set_level(logging.INFO, logger="job_validation")
+    listings = [make_listing(), make_listing()]
+
+    assert only_open_listings(listings) == listings
+    assert caplog.records == []
+
+
+# Any iterable works, and an empty input gives an empty result
+def test_only_open_listings_accepts_generator_and_empty_input():
+    assert only_open_listings(listing for listing in [make_listing(status="closed")]) == []
+    assert only_open_listings([]) == []

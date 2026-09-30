@@ -287,7 +287,8 @@ def test_fetch_all_skips_failed_board_and_returns_other_boards_jobs():
 
     jobs = fetch_all([down, healthy])
 
-    assert [job.source_job_id for job in jobs] == ["4012345", "4012346", "4012347"]
+    # The healthy board's third job has an expired application deadline, so only its open jobs come back.
+    assert [job.source_job_id for job in jobs] == ["4012345", "4012346"]
 
 
 # --- pay and status (#65) ---
@@ -371,3 +372,46 @@ def test_job_with_unparseable_deadline_stays_open():
     payload["jobs"][0]["application_deadline"] = "soon"
 
     assert make_scraper(payload=payload).fetch_jobs()[0].status == "open"
+
+
+# --- only open listings (#66) ---
+
+OPEN_CLOSED_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "greenhouse_jobs_open_closed.json"
+FIXTURE_NOW = datetime(2026, 9, 27, tzinfo=timezone.utc)
+
+
+def load_open_closed_fixture() -> dict:
+    """A saved board with three open jobs and two whose application deadline has passed."""
+    with open(OPEN_CLOSED_FIXTURE_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+# From a local copy of a board with open and closed jobs, only the open ones are returned
+def test_fetch_open_jobs_returns_only_open_listings():
+    scraper = make_scraper(payload=load_open_closed_fixture(), now=FIXTURE_NOW)
+
+    jobs = scraper.fetch_open_jobs()
+
+    assert [job.source_job_id for job in jobs] == ["6000001", "6000003", "6000005"]
+    assert all(job.status == "open" for job in jobs)
+
+
+# The raw fetch still reports every job with its status, so closed jobs can be inspected
+def test_fetch_jobs_still_returns_closed_listings_with_status():
+    scraper = make_scraper(payload=load_open_closed_fixture(), now=FIXTURE_NOW)
+
+    jobs = scraper.fetch_jobs()
+
+    assert len(jobs) == 5
+    assert [job.status for job in jobs] == ["open", "closed", "open", "closed", "open"]
+
+
+# The combined run over several boards never includes a closed listing
+def test_fetch_all_excludes_closed_listings():
+    mixed = make_scraper(payload=load_open_closed_fixture(), now=FIXTURE_NOW)
+
+    jobs = fetch_all([mixed, make_scraper(now=FIXTURE_NOW)])
+
+    assert all(job.status == "open" for job in jobs)
+    assert "6000002" not in [job.source_job_id for job in jobs]
+    assert "6000004" not in [job.source_job_id for job in jobs]
