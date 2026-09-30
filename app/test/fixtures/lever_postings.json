@@ -1,0 +1,57 @@
+[
+  {
+    "id": "6ed76ce8-4156-4b60-b120-403538bd66cd",
+    "text": "Administrative Business Partner",
+    "categories": {
+      "commitment": "Full-time",
+      "location": "Singapore, Singapore",
+      "team": "Administrative",
+      "allLocations": ["Singapore, Singapore"]
+    },
+    "country": "SG",
+    "workplaceType": "hybrid",
+    "createdAt": 1786469891368,
+    "description": "<div><strong>A World-Changing Company</strong></div>\n<div>Acme builds software for data-driven decisions.</div>",
+    "descriptionPlain": "A World-Changing Company\nAcme builds software for data-driven decisions.",
+    "lists": [
+      {
+        "text": "What you'll do",
+        "content": "<li>Provide administrative support.</li>\n<li>Handle scheduling.</li>"
+      }
+    ],
+    "additional": "<div>Acme is an equal opportunity employer.</div>",
+    "additionalPlain": "Acme is an equal opportunity employer.",
+    "salaryRange": {
+      "min": 90000,
+      "max": 120000,
+      "currency": "USD",
+      "interval": "per-year-salary"
+    },
+    "hostedUrl": "https://jobs.lever.co/acme/6ed76ce8-4156-4b60-b120-403538bd66cd",
+    "applyUrl": "https://jobs.lever.co/acme/6ed76ce8-4156-4b60-b120-403538bd66cd/apply"
+  },
+  {
+    "id": "0b1c2d3e-0000-4000-8000-000000000002",
+    "text": "Data Analyst",
+    "categories": {
+      "commitment": "Full-time",
+      "team": "Data"
+    },
+    "createdAt": 1786000000000,
+    "description": "",
+    "descriptionPlain": "",
+    "lists": [],
+    "additional": "",
+    "hostedUrl": "https://jobs.lever.co/acme/0b1c2d3e-0000-4000-8000-000000000002",
+    "applyUrl": "https://jobs.lever.co/acme/0b1c2d3e-0000-4000-8000-000000000002/apply"
+  },
+  {
+    "id": "0b1c2d3e-0000-4000-8000-000000000003",
+    "text": "Product Designer",
+    "categories": {
+      "location": "Remote"
+    },
+    "description": "<p>Design delightful products.</p>",
+    "hostedUrl": "https://jobs.lever.co/acme/0b1c2d3e-0000-4000-8000-000000000003"
+  }
+]
