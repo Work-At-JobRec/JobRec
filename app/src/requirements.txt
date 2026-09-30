@@ -8,5 +8,5 @@ pytest
 pypdf
 python-docx
 requests
-auth0-server-python
+auth0-api-python
 dotenv
