@@ -11,3 +11,4 @@ requests
 auth0-api-python
 dotenv
 psycopg
+psycopg_c
