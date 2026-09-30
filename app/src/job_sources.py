@@ -21,6 +21,7 @@ from job_store import UpsertResult
 from lever_scraper import LeverScraper
 from scrape_pipeline import run_scrape_pipeline
 from scraper_base import BaseScraper
+from workday_scraper import WorkdayScraper
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ DEFAULT_SOURCES_PATH = Path(__file__).with_name("job_sources.json")
 SCRAPER_TYPES: dict[str, type] = {
     "greenhouse": GreenhouseScraper,
     "lever": LeverScraper,
+    "workday": WorkdayScraper,
 }
 
 
