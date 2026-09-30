@@ -14,15 +14,20 @@ from flask import (
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
-from openaiapi import UserInfoTable, update_skill_db, UserInfo, UserPersonal, Base
+from openaiapi import UserInfoTable, update_skill_db, UserInfo, Base, update_user_info
 from job_store import (
     JobListingTable,
-)  # noqa: F401  (registers the job_listings table before create_all below)
+)
 from threading import Thread
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
 from auth import require_auth, get_user_id
+from listing_search.find_listings import (
+    find_percentile,
+    find_skill_gaps,
+    get_job_recommendations,
+)
 
 load_dotenv()
 
@@ -49,6 +54,103 @@ if env.get("DEV") is not None:
 Base.metadata.create_all(engine)
 
 
+
+# Given a user, their search preferences, and a pagination number, return the next page of job search results
+@app.route("/api/job_feed", methods=["GET"])
+@require_auth
+def get_job_feed():
+    data = request.get_json()
+    user_id = get_user_id()
+
+    salary_low = data.get("salary_low")
+    salary_high = data.get("salary_high")
+    radius = data.get("location_radius")
+    position_type = data.get("position_type")
+    location_override = data.get("location_override")
+    position_name = data.get("position_name")
+    company_name = data.get("company_name")
+    page = data.get("page")
+
+    try:
+        return jsonify(
+            get_job_recommendations(
+                user_id,
+                page,
+                salary_low,
+                salary_high,
+                radius,
+                position_type,
+                location_override,
+                position_name,
+                company_name,
+            )
+        )
+    except TypeError:
+        return Response(status=400)
+
+
+@app.route("/api/update_profile", methods=["PUT"])
+@require_auth
+def update_profile():
+    data = request.get_json()
+    user_id = get_user_id()
+
+    name = data.get("name")
+    email = data.get("email")
+    phone = data.get("phone")
+    address = data.get("address")
+    # TODO: validation
+    skills = data.get("skills")
+    education = data.get("education")
+    projects = data.get("projects")
+    socials = data.get("socials")
+    employment_history = data.get("employment_history")
+    # TODO: probably needs some model_validates before this point
+    return jsonify(
+        update_user_info(
+            user_id,
+            name,
+            email,
+            phone,
+            address,
+            skills,
+            education,
+            projects,
+            socials,
+            employment_history,
+        )
+    )
+
+
+# given a user and a listing, identify the skill gaps the user has
+@app.route("/api/skill_gap")
+@require_auth
+def request_skill_gaps():
+    data = request.get_json()
+    user_id = get_user_id()
+
+    listing_id = data.get("listing_id")
+    return jsonify(find_skill_gaps(user_id, listing_id))
+
+
+# given a user and a listing, estimate the percentage of candidates the user exceeds in qualifications
+@app.route("/api/candidate_percentile")
+@require_auth
+def get_candidate_percentile():
+    data = request.get_json()
+    user_id = get_user_id()
+
+    listing_id = data.get("listing_id")
+    return jsonify(find_percentile(user_id, listing_id))
+
+
+# prune jobs from the database which are closed
+@app.route("/api/prune", methods=["POST"])
+@require_auth
+def prune_old_jobs():
+    # TODO: ensure user is admin, then prune
+    raise NotImplementedError
+   
 @app.route("/api/onboarding", methods=["POST"])
 @require_auth
 def complete_onboarding():

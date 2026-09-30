@@ -167,3 +167,17 @@ def parse_resume(filename: str) -> UserInfo | None:
     )
 
     return response.output_parsed
+ 
+def update_user_info(
+    user_id: str,
+    name: str | None,
+    email: str | None,
+    phone: str | None,
+    address: str | None,
+    skills: list[SkillRanking],
+    education: list[Education],
+    projects: list[str],
+    socials: list[Social],
+    employment_history: list[Employment],
+):
+    raise NotImplementedError
