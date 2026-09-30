@@ -16,7 +16,7 @@ SRC_DIR = os.path.abspath(
 sys.path.insert(0, SRC_DIR)
 
 from job_listing import JobListing  # noqa: E402
-from greenhouse_scraper import GreenhouseScraper, GREENHOUSE_JOBS_URL, parse_iso8601  # noqa: E402
+from greenhouse_scraper import GreenhouseScraper, GREENHOUSE_JOBS_URL, format_pay_ranges, parse_iso8601  # noqa: E402
 from job_validation import filter_valid_listings  # noqa: E402
 from scraper_base import ScraperRequestError  # noqa: E402
 from scraper_runner import fetch_all  # noqa: E402
@@ -53,15 +53,15 @@ def test_fetch_jobs_returns_one_listing_per_job():
     assert all(isinstance(job, JobListing) for job in jobs)
 
 
-# The scraper calls the board's jobs endpoint and asks for full job content
-def test_fetch_jobs_requests_board_url_with_content_param():
+# The scraper calls the board's jobs endpoint and asks for full job content and pay ranges
+def test_fetch_jobs_requests_board_url_with_content_and_pay_params():
     session = make_session(load_fixture())
 
     GreenhouseScraper("acme", session=session).fetch_jobs()
 
     session.get.assert_called_once_with(
         GREENHOUSE_JOBS_URL.format(board_token="acme"),
-        params={"content": "true"},
+        params={"content": "true", "pay_transparency": "true"},
         timeout=ANY,
     )
 
@@ -288,3 +288,86 @@ def test_fetch_all_skips_failed_board_and_returns_other_boards_jobs():
     jobs = fetch_all([down, healthy])
 
     assert [job.source_job_id for job in jobs] == ["4012345", "4012346", "4012347"]
+
+
+# --- pay and status (#65) ---
+
+# A published salary range is turned into one readable line
+def test_format_pay_ranges_single_range():
+    ranges = [{"min_cents": 16500000, "max_cents": 19000000, "currency_type": "USD", "title": "Annual Base Salary Range:"}]
+
+    assert format_pay_ranges(ranges) == "USD 165,000-190,000 (Annual Base Salary Range)"
+
+
+# Several ranges are joined so none of the published information is lost
+def test_format_pay_ranges_multiple_ranges_joined():
+    ranges = [
+        {"min_cents": 10000000, "max_cents": 12000000, "currency_type": "USD", "title": "Base:"},
+        {"min_cents": 1000000, "max_cents": 2000000, "currency_type": "USD", "title": "Bonus"},
+    ]
+
+    assert format_pay_ranges(ranges) == "USD 100,000-120,000 (Base); USD 10,000-20,000 (Bonus)"
+
+
+# A range without a title still reads sensibly
+def test_format_pay_ranges_without_title():
+    assert format_pay_ranges([{"min_cents": 5000000, "max_cents": 7500000, "currency_type": "EUR"}]) == "EUR 50,000-75,000"
+
+
+# No published pay means no pay value, never an empty string
+def test_format_pay_ranges_empty_or_missing_returns_none():
+    assert format_pay_ranges([]) is None
+    assert format_pay_ranges(None) is None
+
+
+# Entries that are not well-formed are ignored instead of breaking the listing
+def test_format_pay_ranges_skips_malformed_entries():
+    ranges = [
+        {"min_cents": "lots", "max_cents": None, "currency_type": "USD", "title": "Broken"},
+        "not a dict",
+        {"min_cents": 5000000, "max_cents": 6000000, "currency_type": "USD", "title": "Good"},
+    ]
+
+    assert format_pay_ranges(ranges) == "USD 50,000-60,000 (Good)"
+
+
+# A job with pay ranges in the API response carries them on the listing
+def test_job_with_pay_ranges_has_pay():
+    job = make_scraper().fetch_jobs()[0]
+
+    assert job.pay == "USD 165,000-190,000 (Annual Base Salary Range)"
+
+
+# A job without pay ranges has no pay value
+def test_job_without_pay_ranges_has_no_pay():
+    jobs = make_scraper().fetch_jobs()
+
+    assert jobs[1].pay is None
+    assert jobs[2].pay is None
+
+
+# A job with no application deadline is open
+def test_job_without_deadline_is_open():
+    assert make_scraper().fetch_jobs()[0].status == "open"
+
+
+# A job whose application deadline has passed is closed
+def test_job_with_past_deadline_is_closed():
+    now = datetime(2026, 9, 27, tzinfo=timezone.utc)
+
+    assert make_scraper(now=now).fetch_jobs()[2].status == "closed"
+
+
+# A job whose application deadline is still in the future is open
+def test_job_with_future_deadline_is_open():
+    now = datetime(2025, 12, 1, tzinfo=timezone.utc)
+
+    assert make_scraper(now=now).fetch_jobs()[2].status == "open"
+
+
+# A deadline that cannot be parsed does not close the job
+def test_job_with_unparseable_deadline_stays_open():
+    payload = load_fixture()
+    payload["jobs"][0]["application_deadline"] = "soon"
+
+    assert make_scraper(payload=payload).fetch_jobs()[0].status == "open"

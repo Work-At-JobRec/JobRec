@@ -19,6 +19,16 @@
         {"id": 87011, "name": "Ireland Locations", "location": null, "child_ids": [], "parent_id": 17446}
       ],
       "metadata": null,
+      "application_deadline": null,
+      "pay_input_ranges": [
+        {
+          "min_cents": 16500000,
+          "max_cents": 19000000,
+          "currency_type": "USD",
+          "title": "Annual Base Salary Range:",
+          "blurb": "&lt;p&gt;Pay depends on level and location.&lt;/p&gt;"
+        }
+      ],
       "content": "&lt;h2&gt;&lt;strong&gt;Who we are&lt;/strong&gt;&lt;/h2&gt;\n&lt;p&gt;Acme builds payment infrastructure &amp; tooling.&lt;/p&gt;"
     },
     {
@@ -45,6 +55,8 @@
       "departments": [],
       "offices": [],
       "metadata": null,
+      "application_deadline": "2026-01-15T23:59:00Z",
+      "pay_input_ranges": [],
       "content": "&lt;p&gt;Design delightful products.&lt;/p&gt;"
     }
   ],
