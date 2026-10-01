@@ -1,12 +1,18 @@
 import traceback
 from openai import OpenAI
 from dotenv import load_dotenv
-from typing import Annotated
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import sqlalchemy
 from db import Base  # noqa: F401  (re-exported: app.py and tests import Base from here)
+from skill_detection import (
+    SkillRanking,
+    detect_document_skills,
+    extract_resume_text,
+    get_skill_catalog,
+    persist_discovered_skills,
+)
 
 _ = load_dotenv()
 
@@ -19,19 +25,6 @@ class UserInfoTable(Base):
     user_id = sqlalchemy.Column("user_id", sqlalchemy.String, primary_key=True)
     info = sqlalchemy.Column("skills", sqlalchemy.JSON)
     done_processing = sqlalchemy.Column("done_processing", sqlalchemy.Boolean)
-
-
-class SkillRanking(BaseModel):
-    skill_name: str = Field(
-        ...,
-        description="Human-readable and distinct name representing a specific skill",
-    )
-    proficiency_level: int = Field(
-        ...,
-        le=4,
-        ge=1,
-        description="Numerical ranking of an applicant's proficiency in this skill from 1-4, where 1 is basic familiarity, 2 is extensive amateur experience, 3 is professional or academic experience, and 4 is proven, long-term mastery.",
-    )
 
 
 class Education(BaseModel):
@@ -94,7 +87,7 @@ class UserInfo(BaseModel):
 
 def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
     try:
-        user_info = parse_resume(filename)
+        user_info = parse_resume(filename, engine)
     except Exception:
         traceback.print_exc()
         user_info = None
@@ -144,7 +137,9 @@ def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
         session.commit()
 
 
-def parse_resume(filename: str) -> UserInfo | None:
+def parse_resume(
+    filename: str, engine: sqlalchemy.engine.Engine | None = None
+) -> UserInfo | None:
 
     uploaded = client.files.create(file=open(filename, "rb"), purpose="assistants")
     response = client.responses.parse(
@@ -152,8 +147,7 @@ def parse_resume(filename: str) -> UserInfo | None:
         instructions="""You are an HR manager who is an expert in reading and parsing resumes.
         First, extract the applicant's contact information: their full name, email address, phone number, and location (city/state or region), as listed on the resume.
         Then, determine the user's employment history, project experience, education, and any linked social media presences.
-        Then, determine what skills the applicant has from their PDF resume.
-        Furthermore, rank their proficiency in each skill on a scale from 1-4, where 1 is basic familiarity, 2 is extensive amateur experience, 3 is professional or academic experience, and 4 is proven, long-term mastery.
+        Extract and rank skills as before; when searchable document text is available, a separate skill detector will replace these results with catalog-constrained and newly discovered skills.
         If any piece of contact information is not present on the resume, leave it null rather than guessing.""",
         input=[
             {
@@ -166,8 +160,27 @@ def parse_resume(filename: str) -> UserInfo | None:
         text_format=UserInfo,
     )
 
-    return response.output_parsed
- 
+    user_info = response.output_parsed
+    if user_info is None:
+        return None
+    resume_text = extract_resume_text(filename)
+    if resume_text.strip():
+        catalog = get_skill_catalog(engine) if engine is not None else []
+        skills, discovered = detect_document_skills(
+            resume_text, catalog, document_type="resume"
+        )
+        if engine is not None:
+            persist_discovered_skills(engine, discovered)
+        user_info.skills = skills + [
+            SkillRanking(
+                skill_name=skill.skill_name,
+                proficiency_level=skill.proficiency_level,
+            )
+            for skill in discovered
+        ]
+    return user_info
+
+
 def update_user_info(
     user_id: str,
     name: str | None,

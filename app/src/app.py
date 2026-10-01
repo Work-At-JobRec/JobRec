@@ -29,6 +29,8 @@ from listing_search.find_listings import (
     get_job_recommendations,
 )
 
+from job_sources import load_sources, scrape_all
+
 load_dotenv()
 
 
@@ -156,7 +158,12 @@ def prune_old_jobs():
 @app.route("/api/run_scraper", methods=["POST"])
 @require_auth
 def start_scraper():
-    raise NotImplementedError
+    # TODO: replace with auth0 permission check
+    if False:
+        p = Thread(target=scrape_all, args=[engine, load_sources()])
+        p.start()
+        print("finished scheduling process")
+        return Response(status=200)
 
 
 @app.route("/api/onboarding", methods=["POST"])

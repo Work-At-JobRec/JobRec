@@ -1,7 +1,7 @@
 """Runs a set of job scrapers without letting one failing source stop the rest."""
 
 import logging
-from typing import Iterable
+from typing import Callable, Iterable
 
 from job_listing import JobListing
 from scraper_base import BaseScraper, ScraperRequestError
@@ -9,7 +9,10 @@ from scraper_base import BaseScraper, ScraperRequestError
 logger = logging.getLogger(__name__)
 
 
-def fetch_all(scrapers: Iterable[BaseScraper]) -> list[JobListing]:
+def fetch_all(
+    scrapers: Iterable[BaseScraper],
+    on_listings: Callable[[list[JobListing]], None] | None = None,
+) -> list[JobListing]:
     """Fetch the open jobs from every scraper and return the combined listings in scraper order.
 
     Listings that no longer accept applicants are left out. A source that cannot be
@@ -20,9 +23,15 @@ def fetch_all(scrapers: Iterable[BaseScraper]) -> list[JobListing]:
     listings: list[JobListing] = []
     for scraper in scrapers:
         try:
-            listings.extend(scraper.fetch_open_jobs())
+            fetched = scraper.fetch_open_jobs()
+            listings.extend(fetched)
+            if on_listings is not None and fetched:
+                on_listings(fetched)
         except ScraperRequestError:
             continue
         except Exception:
-            logger.exception("Unexpected error while scraping source=%s; continuing", scraper.source_name)
+            logger.exception(
+                "Unexpected error while scraping source=%s; continuing",
+                scraper.source_name,
+            )
     return listings
