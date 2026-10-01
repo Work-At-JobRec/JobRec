@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar.jsx";
 import Avatar from "../components/Avatar.jsx";
 import MenuItem from "../components/MenuItem.jsx";
+import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
+
 
 const PLACEHOLDER_CONTACT = {
   name: "Jane Smith",
   email: "janesmith100@gmail.com",
   phone: "(+1) 650-890-0093",
-  location: "West Lafayette, IN",
+  address: "West Lafayette, IN",
 };
 
 function LeftPanel({ processing, userInfo, onUpload }) {
@@ -19,10 +21,10 @@ function LeftPanel({ processing, userInfo, onUpload }) {
       {contact.name && <p className="m-0 text-2xl font-bold">{contact.name}</p>}
       {contact.email && <p className="m-0 mt-1 text-2xl font-bold">{contact.email}</p>}
       {contact.phone && <p className="m-0 mt-1 text-2xl font-bold">{contact.phone}</p>}
-      {contact.location && (
+      {contact.address && (
         <div className="mt-2.5 text-[#9b9b9b] text-[17px] inline-flex items-center justify-center gap-1.5">
           <span>📍</span>
-          <span>{contact.location}</span>
+          <span>{contact.address}</span>
         </div>
       )}
 
@@ -143,28 +145,40 @@ function ProcessingRightPanel() {
 export default function Profile() {
   const [status, setStatus] = useState("loading");
   const [userInfo, setUserInfo] = useState(null);
+  const [userPersonal, setUserpersonal] = useState(null);
   const pollTimer = useRef(null);
+  const { isAuthenticated, isLoading,  accessToken} = useAuthenticatedUser();
 
   const fetchProfile = useCallback(async () => {
-    try {
-      const res = await fetch("/api/profile");
+    try { 
+      const res = await fetch("/api/profile", {headers: {
+          Authorization: `Bearer ${accessToken}`
+        }});
       const data = await res.json();
       setStatus(data.status);
       setUserInfo(data.user_info ?? null);
     } catch (err) {
       console.error("Failed to fetch profile status", err);
     }
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    if (status === "empty") {
+      window.location.href = "/onboarding"
+    }
+  }, [fetchProfile, status])
+
+  useEffect(() => {
+    if(accessToken){
+      fetchProfile();
+    }
+  }, [accessToken]);
 
   useEffect(() => {
     if (status !== "processing") return;
     pollTimer.current = setInterval(fetchProfile, 2000);
     return () => clearInterval(pollTimer.current);
-  }, [status, fetchProfile]);
+  }, [status, fetchProfile, accessToken]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -175,7 +189,9 @@ export default function Profile() {
     formData.append("resume", fileInput.files[0]);
 
     setStatus("processing");
-    await fetch("/upload", { method: "POST", body: formData });
+    await fetch("/upload", { method: "POST", body: formData, headers: {
+          Authorization: `Bearer ${accessToken}`
+        }});
     fetchProfile();
   };
 

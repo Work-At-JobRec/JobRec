@@ -16,23 +16,40 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# TODO: add unique IDs to listings and store them in a database
 class JobListing(BaseModel):
     title: str = Field(..., description="Job title exactly as posted by the source")
     company_name: str = Field(..., description="Name of the hiring company")
     location: Optional[str] = Field(
-        None, description="Free-text location of the role; None when the source does not provide one"
+        None,
+        description="Free-text location of the role; None when the source does not provide one",
     )
     description: str = Field(
-        "", description="Full job description text. May contain HTML until normalization cleans it."
+        "",
+        description="Full job description text. May contain HTML until normalization cleans it.",
     )
-    source: str = Field(..., description='Identifier of the scraper that produced this listing, e.g. "greenhouse"')
-    application_url: str = Field(..., description="URL where a candidate can view or apply for the job")
+    source: str = Field(
+        ...,
+        description='Identifier of the scraper that produced this listing, e.g. "greenhouse"',
+    )
+    application_url: str = Field(
+        ..., description="URL where a candidate can view or apply for the job"
+    )
     posted_at: Optional[datetime] = Field(
-        None, description="When the job was originally posted, if the source reports it (timezone-aware)"
+        None,
+        description="When the job was originally posted, if the source reports it (timezone-aware)",
     )
     scraped_at: datetime = Field(
-        default_factory=_utc_now, description="When this listing was retrieved by the scraper (UTC)"
+        default_factory=_utc_now,
+        description="When this listing was retrieved by the scraper (UTC)",
     )
     source_job_id: Optional[str] = Field(
-        None, description="Source-specific job identifier, stored as a string so it is comparable across sources"
+        None,
+        description="Source-specific job identifier, stored as a string so it is comparable across sources",
+    )
+    pay: Optional[str] = Field(
+        None, description='Human-readable pay information as published by the source, e.g. "USD 100,000-120,000 (Base)"'
+    )
+    status: str = Field(
+        "open", description='Whether the listing still accepts applicants: "open" or "closed"'
     )
