@@ -22,6 +22,8 @@ from threading import Thread
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
+import auth
+from jobs import get_jobs, get_job
 from auth import require_auth, get_user_id
 from listing_search.find_listings import (
     find_percentile,
@@ -219,6 +221,21 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+@app.route('/api/jobs')
+def jobs_api():
+    return jsonify(get_jobs())
+
+@app.route('/api/jobs/<job_id>')
+def job_detail_api(job_id):
+    job = get_job(job_id)
+    if job is None:
+        return jsonify(error="Job not found"), 404
+    return jsonify(job)
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+           
 def valid_resume_file(filepath):
     try:
         extension = filepath.rsplit(".", 1)[1].lower()
