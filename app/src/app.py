@@ -23,7 +23,6 @@ from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
 import auth
-from auth import auth0
 from jobs import get_jobs, get_job
 from auth import require_auth, get_user_id
 from listing_search.find_listings import (
