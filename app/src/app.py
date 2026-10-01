@@ -32,13 +32,15 @@ from listing_search.find_listings import (
 load_dotenv()
 
 
-RESUME_FOLDER = "uploads"
+RESUME_FOLDER = env.get("RESUME_FOLDER", "uploads")
 ALLOWED_EXTENSIONS = {"pdf", "docx"}
 
 os.makedirs(RESUME_FOLDER, exist_ok=True)
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = RESUME_FOLDER
 app.secret_key = "test"
+
+os.makedirs(RESUME_FOLDER, mode=600, exist_ok=True)
 
 mock_userid: str = "test|mockuser1"
 
@@ -52,7 +54,6 @@ if env.get("DEV") is not None:
         session.execute(delete(UserInfoTable))
 
 Base.metadata.create_all(engine)
-
 
 
 # Given a user, their search preferences, and a pagination number, return the next page of job search results
@@ -150,7 +151,8 @@ def get_candidate_percentile():
 def prune_old_jobs():
     # TODO: ensure user is admin, then prune
     raise NotImplementedError
-   
+
+
 @app.route("/api/onboarding", methods=["POST"])
 @require_auth
 def complete_onboarding():

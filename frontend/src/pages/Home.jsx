@@ -14,6 +14,9 @@ export default function Home() {
         Sharvari Deshpande, Luna Brown, Luke McCartney, and Pranav Putta
       </div>
       <div>
+        using {app_base_url} for backend
+      </div>
+      <div>
         {isLoading ? 
           <div>loading...</div>          
         : isAuthenticated ?<div >welcome, {user.name}</div>: <div>not logged in...

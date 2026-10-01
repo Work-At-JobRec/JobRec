@@ -6,6 +6,9 @@ export default defineConfig(({mode}) =>{
   const env = loadEnv(mode, "../", ['VITE_', 'APP_'])
   return {
   plugins: [react()],
+  define:{
+      app_base_url: JSON.stringify(env.APP_BASE_URL),
+    },
   server: {
     proxy: {
       '/api': env.APP_BASE_URL,
