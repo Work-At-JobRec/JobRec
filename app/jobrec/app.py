@@ -162,6 +162,12 @@ def prune_old_jobs():
     raise NotImplementedError
 
 
+@app.route("/api/run_scraper", methods=["POST"])
+@require_auth
+def start_scraper():
+    raise NotImplementedError
+
+
 @app.route("/api/onboarding", methods=["POST"])
 @require_auth
 def complete_onboarding():
