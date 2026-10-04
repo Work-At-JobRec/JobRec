@@ -14,22 +14,29 @@ from flask import (
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
-from openaiapi import UserInfoTable, update_skill_db, UserInfo, Base, update_user_info
-from job_store import (
+from jobrec.openaiapi import (
+    UserInfoTable,
+    update_skill_db,
+    UserInfo,
+    Base,
+    update_user_info,
+)
+from jobrec.job_store import (
     JobListingTable,
 )
 from threading import Thread
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
-import auth
-from jobs import get_jobs, get_job
-from auth import require_auth, get_user_id
-from listing_search.find_listings import (
+import jobrec.auth as auth
+from jobrec.jobs import get_jobs, get_job
+from jobrec.auth import require_auth, get_user_id
+from jobrec.listing_search.find_listings import (
     find_percentile,
     find_skill_gaps,
     get_job_recommendations,
 )
+import importlib
 
 load_dotenv()
 
@@ -221,21 +228,23 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@app.route('/api/jobs')
+@app.route("/api/jobs")
 def jobs_api():
     return jsonify(get_jobs())
 
-@app.route('/api/jobs/<job_id>')
+
+@app.route("/api/jobs/<job_id>")
 def job_detail_api(job_id):
     job = get_job(job_id)
     if job is None:
         return jsonify(error="Job not found"), 404
     return jsonify(job)
 
+
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-           
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 def valid_resume_file(filepath):
     try:
         extension = filepath.rsplit(".", 1)[1].lower()
@@ -258,6 +267,11 @@ def valid_resume_file(filepath):
 
     except Exception:
         return False
+
+
+@app.route("/api/version", methods=["GET"])
+def get_version():
+    return jsonify(f"v{importlib.metadata.version('jobrec')}")
 
 
 @app.route("/upload", methods=["POST"])

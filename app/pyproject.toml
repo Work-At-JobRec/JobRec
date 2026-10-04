@@ -1,0 +1,28 @@
+[project]
+name = "jobrec"
+version = "0.6.0"
+description = "The applicant-focused job platform you didn't know you needed"
+authors = [
+    {name = "Silicasandwhich",email = "43558271+silica-dev@users.noreply.github.com"}
+]
+requires-python = "<4.0,>=3.11"
+dependencies = [
+    "flask[async] (>=3.1.3,<4.0.0)",
+    "werkzeug (>=3.1.9,<4.0.0)",
+    "dotenv (>=0.9.9,<0.10.0)",
+    "openai (>=3.24.0,<4.0.0)",
+    "pydantic (>=2.13.5,<3.0.0)",
+    "sqlalchemy (>=2.1.3,<3.0.0)",
+    "pytest (>=9.1.1,<10.0.0)",
+    "pypdf (>=6.19.0,<7.0.0)",
+    "python-docx (>=1.2.0,<2.0.0)",
+    "auth0-api-python (>=1.0.0b10,<2.0.0)",
+    "psycopg[binary,pool] (>=3.3.6,<4.0.0)",
+    "requests (>=2.34.2,<3.0.0)",
+    "poetry (>=2.5.1,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

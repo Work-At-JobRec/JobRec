@@ -14,9 +14,9 @@ from typing import Iterable, Optional
 from sqlalchemy import DateTime, Engine, Integer, String, Text, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from db import Base
-from job_listing import JobListing
-from job_normalization import normalize_url
+from jobrec.db import Base
+from jobrec.job_listing import JobListing
+from jobrec.job_normalization import normalize_url
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,15 @@ _CHUNK_SIZE = 500
 
 # Fields refreshed from the newest sighting of a known listing.
 _MUTABLE_FIELDS = (
-    "title", "company_name", "location", "description", "application_url",
-    "posted_at", "source_job_id", "pay", "status",
+    "title",
+    "company_name",
+    "location",
+    "description",
+    "application_url",
+    "posted_at",
+    "source_job_id",
+    "pay",
+    "status",
 )
 
 
@@ -45,13 +52,23 @@ class JobListingTable(Base):
     application_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     pay: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
-    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    posted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    scraped_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     # When this job was first stored, and when a scraper last reported it.
-    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     # When any of the job's details last changed.
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 @dataclass
@@ -85,7 +102,9 @@ def listing_key(listing: JobListing) -> str:
     url = normalize_url(listing.application_url)
     if url:
         return f"{source}:url:{url}"
-    fields = "|".join(_squash(v) for v in (listing.company_name, listing.title, listing.location))
+    fields = "|".join(
+        _squash(v) for v in (listing.company_name, listing.title, listing.location)
+    )
     return f"{source}:fields:{fields}"
 
 
@@ -139,7 +158,9 @@ def _apply_changes(row: JobListingTable, listing: JobListing) -> bool:
     return changed
 
 
-def upsert_listings(engine: Engine, listings: Iterable[JobListing], *, now: Optional[datetime] = None) -> UpsertResult:
+def upsert_listings(
+    engine: Engine, listings: Iterable[JobListing], *, now: Optional[datetime] = None
+) -> UpsertResult:
     """Store listings, updating the ones already known instead of duplicating them.
 
     Duplicates inside the batch collapse to the last occurrence. ``now`` is the
@@ -157,14 +178,21 @@ def upsert_listings(engine: Engine, listings: Iterable[JobListing], *, now: Opti
     with Session(engine) as session:
         existing: dict[str, JobListingTable] = {}
         for start in range(0, len(keys), _CHUNK_SIZE):
-            chunk = keys[start:start + _CHUNK_SIZE]
-            for row in session.scalars(select(JobListingTable).where(JobListingTable.dedupe_key.in_(chunk))):
+            chunk = keys[start : start + _CHUNK_SIZE]
+            for row in session.scalars(
+                select(JobListingTable).where(JobListingTable.dedupe_key.in_(chunk))
+            ):
                 existing[row.dedupe_key] = row
 
         for key, listing in by_key.items():
             row = existing.get(key)
             if row is None:
-                row = JobListingTable(dedupe_key=key, source=listing.source, first_seen_at=now, updated_at=now)
+                row = JobListingTable(
+                    dedupe_key=key,
+                    source=listing.source,
+                    first_seen_at=now,
+                    updated_at=now,
+                )
                 _apply_changes(row, listing)
                 session.add(row)
                 result.inserted += 1
@@ -178,7 +206,10 @@ def upsert_listings(engine: Engine, listings: Iterable[JobListing], *, now: Opti
         session.commit()
 
     logger.info(
-        "Stored job listings: %d inserted, %d updated, %d unchanged", result.inserted, result.updated, result.unchanged,
+        "Stored job listings: %d inserted, %d updated, %d unchanged",
+        result.inserted,
+        result.updated,
+        result.unchanged,
     )
     return result
 

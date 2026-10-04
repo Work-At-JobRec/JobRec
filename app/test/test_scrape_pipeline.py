@@ -5,16 +5,14 @@ import pytest
 from sqlalchemy import create_engine
 
 # Lets this test import app/src/scrape_pipeline.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from db import Base  # noqa: E402
-from job_listing import JobListing  # noqa: E402
-from job_store import UpsertResult, count_listings, list_listings  # noqa: E402
-from scrape_pipeline import run_scrape_pipeline  # noqa: E402
-from scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
+from jobrec.db import Base  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_store import UpsertResult, count_listings, list_listings  # noqa: E402
+from jobrec.scrape_pipeline import run_scrape_pipeline  # noqa: E402
+from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
 
 
 @pytest.fixture
@@ -43,7 +41,9 @@ class UnreachableScraper(BaseScraper):
         pass
 
     def fetch_jobs(self) -> list[JobListing]:
-        raise ScraperRequestError(self.source_name, "https://down.example.com/jobs", "connection refused")
+        raise ScraperRequestError(
+            self.source_name, "https://down.example.com/jobs", "connection refused"
+        )
 
 
 def raw_listing(**overrides) -> JobListing:
@@ -87,7 +87,9 @@ def test_pipeline_second_run_reports_existing_not_new(engine):
 
 # A source that cannot be reached does not stop the others from being stored
 def test_pipeline_continues_past_unreachable_scraper(engine):
-    result = run_scrape_pipeline(engine, [UnreachableScraper(), FixedScraper([raw_listing()])])
+    result = run_scrape_pipeline(
+        engine, [UnreachableScraper(), FixedScraper([raw_listing()])]
+    )
 
     assert result.inserted == 1
     assert count_listings(engine) == 1
@@ -95,7 +97,9 @@ def test_pipeline_continues_past_unreachable_scraper(engine):
 
 # A listing that no longer accepts applicants is never stored
 def test_pipeline_does_not_store_closed_listings(engine):
-    scraper = FixedScraper([raw_listing(), raw_listing(source_job_id="2", status="closed")])
+    scraper = FixedScraper(
+        [raw_listing(), raw_listing(source_job_id="2", status="closed")]
+    )
 
     result = run_scrape_pipeline(engine, [scraper])
 
