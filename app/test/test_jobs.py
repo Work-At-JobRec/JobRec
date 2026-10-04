@@ -7,13 +7,22 @@ SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
 # These MUST come after sys.path.insert(...)
-from app import app  # noqa: E402
-from job_listing import JobListing  # noqa: E402
-from jobs import posted_ago, to_api_job  # noqa: E402
+from jobrec.app import app  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.jobs import posted_ago, to_api_job  # noqa: E402
 
 API_FIELDS = {
-    "id", "title", "company", "location", "description", "applicationUrl",
-    "postedAgo", "jobType", "salary", "compatibility", "requirements",
+    "id",
+    "title",
+    "company",
+    "location",
+    "description",
+    "applicationUrl",
+    "postedAgo",
+    "jobType",
+    "salary",
+    "compatibility",
+    "requirements",
 }
 
 

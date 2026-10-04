@@ -3,13 +3,15 @@ import os
 import sys
 
 # Lets this test import app/src/job_validation.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
-from job_validation import filter_valid_listings, only_open_listings, validate_listing  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_validation import (
+    filter_valid_listings,
+    only_open_listings,
+    validate_listing,
+)  # noqa: E402
 
 
 def make_listing(**overrides) -> JobListing:
@@ -90,7 +92,9 @@ def test_url_without_host_is_reported():
 
 # A URL containing whitespace is not usable
 def test_url_with_internal_whitespace_is_reported():
-    problems = validate_listing(make_listing(application_url="https://acme.com/jobs 123"))
+    problems = validate_listing(
+        make_listing(application_url="https://acme.com/jobs 123")
+    )
 
     assert len(problems) == 1
     assert "application_url" in problems[0]
@@ -106,7 +110,9 @@ def test_unparseable_url_is_reported_not_raised():
 
 # Optional fields may all be missing
 def test_missing_optional_fields_are_allowed():
-    listing = make_listing(location=None, posted_at=None, source_job_id=None, description="")
+    listing = make_listing(
+        location=None, posted_at=None, source_job_id=None, description=""
+    )
 
     assert validate_listing(listing) == []
 
@@ -137,7 +143,9 @@ def test_filter_logs_warning_for_each_rejected_listing(caplog):
 
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 2
-    assert "greenhouse" in warnings[0] and "111" in warnings[0] and "title" in warnings[0]
+    assert (
+        "greenhouse" in warnings[0] and "111" in warnings[0] and "title" in warnings[0]
+    )
     assert "222" in warnings[1] and "company_name" in warnings[1]
 
 
@@ -160,6 +168,7 @@ def test_filter_accepts_generator_and_empty_input():
 
 # --- open listings only (#66) ---
 
+
 # Only listings that still accept applicants are kept, in their original order
 def test_only_open_listings_drops_closed_ones():
     open_one = make_listing(title="Open one", status="open")
@@ -173,7 +182,9 @@ def test_only_open_listings_drops_closed_ones():
 def test_only_open_listings_logs_how_many_were_dropped(caplog):
     caplog.set_level(logging.INFO, logger="job_validation")
 
-    only_open_listings([make_listing(status="closed"), make_listing(status="closed"), make_listing()])
+    only_open_listings(
+        [make_listing(status="closed"), make_listing(status="closed"), make_listing()]
+    )
 
     messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
     assert any("2" in m and "closed" in m for m in messages)
@@ -190,5 +201,7 @@ def test_only_open_listings_is_quiet_when_all_open(caplog):
 
 # Any iterable works, and an empty input gives an empty result
 def test_only_open_listings_accepts_generator_and_empty_input():
-    assert only_open_listings(listing for listing in [make_listing(status="closed")]) == []
+    assert (
+        only_open_listings(listing for listing in [make_listing(status="closed")]) == []
+    )
     assert only_open_listings([]) == []

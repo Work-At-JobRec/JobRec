@@ -3,8 +3,8 @@
 import logging
 from typing import Iterable
 
-from job_listing import JobListing
-from scraper_base import BaseScraper, ScraperRequestError
+from jobrec.job_listing import JobListing
+from jobrec.scraper_base import BaseScraper, ScraperRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -24,5 +24,8 @@ def fetch_all(scrapers: Iterable[BaseScraper]) -> list[JobListing]:
         except ScraperRequestError:
             continue
         except Exception:
-            logger.exception("Unexpected error while scraping source=%s; continuing", scraper.source_name)
+            logger.exception(
+                "Unexpected error while scraping source=%s; continuing",
+                scraper.source_name,
+            )
     return listings

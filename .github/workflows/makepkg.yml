@@ -1,0 +1,21 @@
+name: "Generate Release Package"
+
+on:
+    push:
+        branches: ["main"]
+
+permissions:
+    packages: write
+    contents: write
+
+jobs:
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Create Release
+      run:
+        version="$(cat app/pyproject.toml | grep 'version' | grep -Po '\d+\.\d+\.\d+')"
+        gh release create "v$version" -t "JobRec v$version" --generate-notes

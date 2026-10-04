@@ -11,8 +11,8 @@ from typing import Any, Callable, Iterable, Optional
 
 import requests
 
-from job_listing import JobListing
-from job_validation import only_open_listings
+from jobrec.job_listing import JobListing
+from jobrec.job_validation import only_open_listings
 
 logger = logging.getLogger(__name__)
 
@@ -46,18 +46,26 @@ class BaseScraper(ABC):
         """Retrieve only the jobs that still accept applicants. This is what the application consumes."""
         return only_open_listings(self.fetch_jobs())
 
-    def _get_json(self, url: str, params: Optional[dict] = None, timeout: float = DEFAULT_TIMEOUT) -> Any:
+    def _get_json(
+        self, url: str, params: Optional[dict] = None, timeout: float = DEFAULT_TIMEOUT
+    ) -> Any:
         """GET a URL and return its decoded JSON body.
 
         Connection failures, timeouts, non-2xx responses, and bodies that are not JSON
         are logged once with the source and URL, then raised as ScraperRequestError so
         the caller can move on to the next source instead of crashing.
         """
-        return self._request_json(url, lambda: self.session.get(url, params=params, timeout=timeout))
+        return self._request_json(
+            url, lambda: self.session.get(url, params=params, timeout=timeout)
+        )
 
-    def _post_json(self, url: str, payload: dict, timeout: float = DEFAULT_TIMEOUT) -> Any:
+    def _post_json(
+        self, url: str, payload: dict, timeout: float = DEFAULT_TIMEOUT
+    ) -> Any:
         """POST a JSON payload and return the decoded JSON body, with the same error handling as _get_json."""
-        return self._request_json(url, lambda: self.session.post(url, json=payload, timeout=timeout))
+        return self._request_json(
+            url, lambda: self.session.post(url, json=payload, timeout=timeout)
+        )
 
     def _request_json(self, url: str, send: Callable[[], Any]) -> Any:
         try:
@@ -69,10 +77,14 @@ class BaseScraper(ABC):
             failed_response = getattr(exc, "response", None)
             status = getattr(failed_response, "status_code", None)
             detail = f"HTTP {status}: {exc}" if status is not None else str(exc)
-            logger.error("Request failed (source=%s, url=%s): %s", self.source_name, url, detail)
+            logger.error(
+                "Request failed (source=%s, url=%s): %s", self.source_name, url, detail
+            )
             raise ScraperRequestError(self.source_name, url, detail) from exc
 
-    def _build_listings(self, raw_items: Iterable[Any], convert: Callable[[Any], JobListing]) -> list[JobListing]:
+    def _build_listings(
+        self, raw_items: Iterable[Any], convert: Callable[[Any], JobListing]
+    ) -> list[JobListing]:
         """Convert raw source items into JobListings, skipping any single item that cannot be converted.
 
         Without this, one malformed job (for example a numeric title) would raise and
@@ -85,5 +97,10 @@ class BaseScraper(ABC):
             except (ValueError, TypeError, AttributeError, KeyError) as exc:
                 # pydantic.ValidationError is a ValueError.
                 raw_id = raw.get("id") if isinstance(raw, dict) else None
-                logger.warning("Skipping malformed %s job (id=%r): %s", self.source_name, raw_id, exc)
+                logger.warning(
+                    "Skipping malformed %s job (id=%r): %s",
+                    self.source_name,
+                    raw_id,
+                    exc,
+                )
         return listings

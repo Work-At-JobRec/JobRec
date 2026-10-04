@@ -3,18 +3,21 @@ import os
 import sys
 
 # Lets this test import app/src/scraper_runner.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
-from scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
-from scraper_runner import fetch_all  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
+from jobrec.scraper_runner import fetch_all  # noqa: E402
 
 
 def make_listing(source: str, title: str) -> JobListing:
-    return JobListing(title=title, company_name="Acme", source=source, application_url="https://example.com/job")
+    return JobListing(
+        title=title,
+        company_name="Acme",
+        source=source,
+        application_url="https://example.com/job",
+    )
 
 
 class WorkingScraper(BaseScraper):
@@ -35,7 +38,9 @@ class UnreachableScraper(BaseScraper):
         pass
 
     def fetch_jobs(self) -> list[JobListing]:
-        raise ScraperRequestError(self.source_name, "https://down.example.com/jobs", "connection refused")
+        raise ScraperRequestError(
+            self.source_name, "https://down.example.com/jobs", "connection refused"
+        )
 
 
 class BrokenScraper(BaseScraper):
@@ -57,7 +62,9 @@ def test_fetch_all_combines_listings_in_scraper_order():
 
 # A source that cannot be reached does not stop the remaining sources
 def test_fetch_all_continues_after_scraper_request_error():
-    jobs = fetch_all([WorkingScraper("a", ["A1"]), UnreachableScraper(), WorkingScraper("b", ["B1"])])
+    jobs = fetch_all(
+        [WorkingScraper("a", ["A1"]), UnreachableScraper(), WorkingScraper("b", ["B1"])]
+    )
 
     assert [job.title for job in jobs] == ["A1", "B1"]
 
@@ -86,6 +93,7 @@ def test_fetch_all_with_no_scrapers_returns_empty_list():
 
 # --- only open listings (#66) ---
 
+
 class MixedStatusScraper(BaseScraper):
     source_name = "mixed"
 
@@ -95,7 +103,9 @@ class MixedStatusScraper(BaseScraper):
     def fetch_jobs(self) -> list[JobListing]:
         return [
             make_listing(self.source_name, "Open"),
-            make_listing(self.source_name, "Closed").model_copy(update={"status": "closed"}),
+            make_listing(self.source_name, "Closed").model_copy(
+                update={"status": "closed"}
+            ),
         ]
 
 

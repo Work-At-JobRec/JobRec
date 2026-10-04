@@ -12,7 +12,7 @@ algorithm), so they're placeholders in SAMPLE_MATCHES until then.
 
 from datetime import datetime, timedelta, timezone
 
-from job_listing import JobListing
+from jobrec.job_listing import JobListing
 
 _now = datetime.now(timezone.utc)
 
@@ -59,7 +59,11 @@ SAMPLE_MATCHES = {
         "requirements": [
             {"text": "Bachelors degree in", "skill": "computer science", "met": True},
             {"text": "Ability to work with", "skill": "Python", "met": True},
-            {"text": "Experience with the", "skill": "Microsoft Office Suite", "met": False},
+            {
+                "text": "Experience with the",
+                "skill": "Microsoft Office Suite",
+                "met": False,
+            },
         ],
     },
     "sample-2": {

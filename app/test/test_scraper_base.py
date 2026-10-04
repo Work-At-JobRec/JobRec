@@ -7,13 +7,11 @@ import pytest
 import requests
 
 # Lets this test import app/src/scraper_base.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
-from scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
 
 
 def make_listing(source: str) -> JobListing:
@@ -89,7 +87,9 @@ class DummyScraper(BaseScraper):
         return []
 
 
-def make_session(payload=None, get_error=None, status_error=None, json_error=None) -> Mock:
+def make_session(
+    payload=None, get_error=None, status_error=None, json_error=None
+) -> Mock:
     """A stand-in for requests.Session that succeeds or fails in a chosen way."""
     response = Mock()
     response.json.return_value = payload
@@ -132,7 +132,9 @@ def test_get_json_connection_error_raises_scraper_request_error():
 
 # A request that takes too long becomes a ScraperRequestError
 def test_get_json_timeout_raises_scraper_request_error():
-    scraper = DummyScraper(session=make_session(get_error=requests.Timeout("timed out")))
+    scraper = DummyScraper(
+        session=make_session(get_error=requests.Timeout("timed out"))
+    )
 
     with pytest.raises(ScraperRequestError):
         scraper._get_json(URL)
@@ -151,7 +153,9 @@ def test_get_json_http_error_raises_scraper_request_error():
 
 # A body that is not JSON becomes a ScraperRequestError
 def test_get_json_invalid_json_raises_scraper_request_error():
-    scraper = DummyScraper(session=make_session(json_error=ValueError("Expecting value")))
+    scraper = DummyScraper(
+        session=make_session(json_error=ValueError("Expecting value"))
+    )
 
     with pytest.raises(ScraperRequestError):
         scraper._get_json(URL)
@@ -160,18 +164,27 @@ def test_get_json_invalid_json_raises_scraper_request_error():
 # A failed request is logged once with the source, the URL, and the error
 def test_get_json_failure_logs_source_url_and_error(caplog):
     caplog.set_level(logging.ERROR, logger="scraper_base")
-    scraper = DummyScraper(session=make_session(get_error=requests.ConnectionError("connection refused")))
+    scraper = DummyScraper(
+        session=make_session(get_error=requests.ConnectionError("connection refused"))
+    )
 
     with pytest.raises(ScraperRequestError):
         scraper._get_json(URL)
 
     errors = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
     assert len(errors) == 1
-    assert "dummy" in errors[0] and URL in errors[0] and "connection refused" in errors[0]
+    assert (
+        "dummy" in errors[0] and URL in errors[0] and "connection refused" in errors[0]
+    )
 
 
 def to_listing(raw: dict) -> JobListing:
-    return JobListing(title=raw["title"], company_name="Acme", source="dummy", application_url=raw["url"])
+    return JobListing(
+        title=raw["title"],
+        company_name="Acme",
+        source="dummy",
+        application_url=raw["url"],
+    )
 
 
 # One item that cannot be converted is skipped; the rest are still returned
@@ -202,6 +215,7 @@ def test_build_listings_logs_warning_with_source_and_raw_id(caplog):
 
 
 # --- POST requests (#67) ---
+
 
 # A successful POST returns the decoded JSON body and sends the given JSON payload
 def test_post_json_sends_payload_and_returns_decoded_body():
