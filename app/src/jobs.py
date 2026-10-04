@@ -1,18 +1,44 @@
 """Job listings served to the frontend via /api/jobs.
 
 Jobs are JobListing objects (see job_listing.py), the same model every scraper
-produces. to_api_job() turns one into the JSON the Jobs pages render, so to show
-real jobs, replace get_job_listings() with a read from the scraper's storage;
-the frontend needs no changes.
+produces. to_api_job() turns one into the JSON the Jobs pages render.
 
-Salary, job type, compatibility and requirement matches aren't part of
-JobListing yet (compatibility and matches will come from the matching
-algorithm), so they're placeholders in SAMPLE_MATCHES until then.
+When the scraper has stored listings (see job_store.py), those are served: the
+list returns the most recently posted ones with a short description, and the
+detail returns one listing with its full description. The SAMPLE_LISTINGS below
+are served only when no database is given or nothing is stored yet, so a fresh
+checkout still shows something.
+
+Salary comes from the listing's scraped pay, and job type is inferred from the
+title. Compatibility and requirement matches will come from the matching
+algorithm; until then they are empty for real listings (the samples keep their
+placeholders in SAMPLE_MATCHES).
 """
 
+import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 from job_listing import JobListing
+from job_store import count_listings, get_listing, list_recent_listings
+
+logger = logging.getLogger(__name__)
+
+# How many listings /api/jobs returns unless asked otherwise, and the most it will return.
+# The frontend loads the whole list at once, so this bounds the response size.
+DEFAULT_JOB_LIMIT = 500
+MAX_JOB_LIMIT = 1000
+# Length of the description sent with each job in the list; the detail route sends it in full.
+LIST_DESCRIPTION_CHARS = 300
+# Characters that would break the frontend's /jobs/<id> route if they appeared in an id.
+_UNSAFE_ID_CHARS = ("/", "?", "#")
+
+# Job type as the frontend's filters name it, inferred from words in the title.
+_JOB_TYPE_PATTERNS = (
+    ("Internship", re.compile(r"\b(intern|interns|internship|internships|co-?op)\b", re.IGNORECASE)),
+    ("Part Time", re.compile(r"\bpart[- ]time\b", re.IGNORECASE)),
+    ("Contract", re.compile(r"\b(contract|contractor)\b", re.IGNORECASE)),
+)
 
 _now = datetime.now(timezone.utc)
 
@@ -85,9 +111,37 @@ SAMPLE_MATCHES = {
 }
 
 
-def get_job_listings():
-    """Return all job listings. Swap this out for the scraper's data source."""
-    return SAMPLE_LISTINGS
+def _store_has_listings(engine):
+    return engine is not None and count_listings(engine) > 0
+
+
+def get_job_listings(engine=None, limit=None):
+    """Return the listings to show: stored ones (newest first, short descriptions), else the samples."""
+    if not _store_has_listings(engine):
+        if engine is not None:
+            logger.warning("No stored job listings found; serving the sample listings instead")
+        return SAMPLE_LISTINGS
+    limit = max(1, min(DEFAULT_JOB_LIMIT if limit is None else limit, MAX_JOB_LIMIT))
+    listings = list_recent_listings(engine, limit, description_chars=LIST_DESCRIPTION_CHARS)
+    return [listing for listing in listings if not any(ch in listing.source_job_id for ch in _UNSAFE_ID_CHARS)]
+
+
+def infer_job_type(title):
+    """Job type for the frontend's filters ("Internship", "Part Time", "Contract", "Full Time"), from the title.
+
+    Whole words only, so "Internal Tools Engineer" is not mistaken for an internship.
+    """
+    for job_type, pattern in _JOB_TYPE_PATTERNS:
+        if pattern.search(title or ""):
+            return job_type
+    return "Full Time"
+
+
+def first_pay_range(pay):
+    """The first range of a scraped pay line (ranges are joined with ";"), or None when there is no pay."""
+    if not pay:
+        return None
+    return pay.split(";")[0].strip() or None
 
 
 def job_id(listing):
@@ -105,29 +159,43 @@ def posted_ago(posted_at):
     return f"{days} Day{'' if days == 1 else 's'} Ago"
 
 
-def to_api_job(listing):
-    """Convert a JobListing into the dict the frontend renders."""
+def to_api_job(listing, summary=False):
+    """Convert a JobListing into the dict the frontend renders.
+
+    With ``summary`` set (the list), a description that was cut short ends in an ellipsis.
+    """
     id_ = job_id(listing)
     match = SAMPLE_MATCHES.get(id_, {})
+    description = listing.description
+    if summary and len(description) >= LIST_DESCRIPTION_CHARS:
+        description = description[:LIST_DESCRIPTION_CHARS].rstrip() + "…"
     return {
         "id": id_,
         "title": listing.title,
         "company": listing.company_name,
         "location": listing.location,
-        "description": listing.description,
+        "description": description,
         "applicationUrl": listing.application_url,
         "postedAgo": posted_ago(listing.posted_at),
-        "jobType": match.get("jobType"),
-        "salary": match.get("salary"),
+        "jobType": match.get("jobType") or infer_job_type(listing.title),
+        "salary": match.get("salary") or first_pay_range(listing.pay),
         "compatibility": match.get("compatibility"),
         "requirements": match.get("requirements", []),
     }
 
 
-def get_jobs():
-    return [to_api_job(listing) for listing in get_job_listings()]
+def get_jobs(engine=None, limit=None):
+    """Return the jobs for the list pages."""
+    return [to_api_job(listing, summary=True) for listing in get_job_listings(engine, limit)]
 
 
-def get_job(id_):
-    """Return the job with the given id, or None if it doesn't exist."""
-    return next((job for job in get_jobs() if job["id"] == id_), None)
+def get_job(id_, engine=None):
+    """Return the job with the given id and its full description, or None if it doesn't exist."""
+    if _store_has_listings(engine):
+        # Ids are "<source>-<source job id>"; source names contain no hyphen, the job id may.
+        source, _, source_job_id = (id_ or "").partition("-")
+        if not source or not source_job_id:
+            return None
+        listing = get_listing(engine, source, source_job_id)
+        return to_api_job(listing) if listing is not None else None
+    return next((to_api_job(listing) for listing in SAMPLE_LISTINGS if job_id(listing) == id_), None)

@@ -223,11 +223,11 @@ def allowed_file(filename):
 
 @app.route('/api/jobs')
 def jobs_api():
-    return jsonify(get_jobs())
+    return jsonify(get_jobs(engine, limit=request.args.get("limit", type=int)))
 
 @app.route('/api/jobs/<job_id>')
 def job_detail_api(job_id):
-    job = get_job(job_id)
+    job = get_job(job_id, engine)
     if job is None:
         return jsonify(error="Job not found"), 404
     return jsonify(job)

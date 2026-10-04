@@ -102,7 +102,7 @@ export default function JobDetail() {
                   Report Listing
                 </button>
               </div>
-              <p className="text-2xl mt-4">{job.description}</p>
+              <p className="text-2xl mt-4 whitespace-pre-line">{job.description}</p>
 
               {job.requirements.length > 0 && (
                 <>
