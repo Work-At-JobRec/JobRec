@@ -180,7 +180,7 @@ def test_only_open_listings_drops_closed_ones():
 
 # Dropped listings are counted in the log so a source that is all closed is noticeable
 def test_only_open_listings_logs_how_many_were_dropped(caplog):
-    caplog.set_level(logging.INFO, logger="job_validation")
+    caplog.set_level(logging.INFO, logger="jobrec.job_validation")
 
     only_open_listings(
         [make_listing(status="closed"), make_listing(status="closed"), make_listing()]

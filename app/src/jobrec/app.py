@@ -269,9 +269,9 @@ def valid_resume_file(filepath):
         return False
 
 
-@app.route("/version", methods=["GET"])
+@app.route("/api/version", methods=["GET"])
 def get_version():
-    return jsonify(importlib.metadata.version("jobrec"))
+    return jsonify(f"v{importlib.metadata.version('jobrec')}")
 
 
 @app.route("/upload", methods=["POST"])

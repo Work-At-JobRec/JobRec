@@ -144,7 +144,9 @@ def test_build_scraper_constructs_the_right_type():
 
 # Every enabled source is scraped and stored, with a result reported per source
 def test_scrape_all_runs_every_enabled_source(engine, monkeypatch):
-    monkeypatch.setitem(__import__("job_sources").SCRAPER_TYPES, "fake", FakeScraper)
+    monkeypatch.setitem(
+        __import__("jobrec").job_sources.SCRAPER_TYPES, "fake", FakeScraper
+    )
     sources = [JobSource(scraper="fake", id="one"), JobSource(scraper="fake", id="two")]
 
     results = scrape_all(engine, sources)
@@ -157,7 +159,9 @@ def test_scrape_all_runs_every_enabled_source(engine, monkeypatch):
 
 # Disabled sources are skipped and do not appear in the results
 def test_scrape_all_skips_disabled_sources(engine, monkeypatch):
-    monkeypatch.setitem(__import__("job_sources").SCRAPER_TYPES, "fake", FakeScraper)
+    monkeypatch.setitem(
+        __import__("jobrec").job_sources.SCRAPER_TYPES, "fake", FakeScraper
+    )
     sources = [
         JobSource(scraper="fake", id="one"),
         JobSource(scraper="fake", id="two", enabled=False),
@@ -171,15 +175,16 @@ def test_scrape_all_skips_disabled_sources(engine, monkeypatch):
 
 # A source that fails is logged and the rest are still scraped
 def test_scrape_all_continues_past_failing_source(engine, monkeypatch, caplog):
-    monkeypatch.setitem(__import__("job_sources").SCRAPER_TYPES, "fake", FakeScraper)
-    caplog.set_level(logging.INFO, logger="job_sources")
+    monkeypatch.setitem(
+        __import__("jobrec").job_sources.SCRAPER_TYPES, "fake", FakeScraper
+    )
+    caplog.set_level(logging.INFO, logger="jobrec.job_sources")
     sources = [
         JobSource(scraper="fake", id="down"),
         JobSource(scraper="fake", id="two"),
     ]
 
     results = scrape_all(engine, sources)
-
     assert [(name, result.inserted) for name, result in results] == [
         ("fake:down", 0),
         ("fake:two", 1),
@@ -190,7 +195,9 @@ def test_scrape_all_continues_past_failing_source(engine, monkeypatch, caplog):
 
 # Running again over the same sources adds nothing new
 def test_scrape_all_second_run_adds_nothing(engine, monkeypatch):
-    monkeypatch.setitem(__import__("job_sources").SCRAPER_TYPES, "fake", FakeScraper)
+    monkeypatch.setitem(
+        __import__("jobrec").job_sources.SCRAPER_TYPES, "fake", FakeScraper
+    )
     sources = [JobSource(scraper="fake", id="one")]
     scrape_all(engine, sources)
 

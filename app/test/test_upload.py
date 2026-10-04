@@ -21,10 +21,11 @@ async def mock_verify_access_token(token):
 def ignore_auth(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        with patch("app.get_user_id") as mock_auth0:
+        with patch("jobrec.app.get_user_id") as mock_auth0:
             mock_auth0.return_value = mock_user
             with patch(
-                "auth.api_client.verify_access_token", new=mock_verify_access_token
+                "jobrec.auth.api_client.verify_access_token",
+                new=mock_verify_access_token,
             ):
                 return f(*args, **kwargs)
 
@@ -83,7 +84,7 @@ def test_corrupted_pdf_upload_is_not_saved(tmp_path):
     client = app.test_client()
 
     fake_pdf = io.BytesIO(b"fake pdf contents")
-    with patch("app.Thread"):
+    with patch("jobrec.app.Thread"):
         response = client.post(
             "/upload",
             data={"resume": (fake_pdf, "test_resume.pdf")},
@@ -109,7 +110,7 @@ def test_corrupted_docx_upload_is_not_saved(tmp_path):
 
     fake_docx = io.BytesIO(b"fake docx contents")
 
-    with patch("app.Thread"):
+    with patch("jobrec.app.Thread"):
         response = client.post(
             "/upload",
             data={"resume": (fake_docx, "test_resume.docx")},
@@ -140,7 +141,7 @@ def test_valid_pdf_upload_is_saved(tmp_path):
     )
 
     with open(resume_path, "rb") as resume_file:
-        with patch("app.Thread"):
+        with patch("jobrec.app.Thread"):
             response = client.post(
                 "/upload",
                 data={
@@ -176,7 +177,7 @@ def test_valid_docx_upload_is_saved(tmp_path):
     )
 
     with open(resume_path, "rb") as resume_file:
-        with patch("app.Thread"):
+        with patch("jobrec.app.Thread"):
             response = client.post(
                 "/upload",
                 data={
@@ -269,7 +270,7 @@ def test_profile_displays_skills(tmp_path):
     app.config["TESTING"] = True
     client = app.test_client()
 
-    with patch("app.engine", test_engine):
+    with patch("jobrec.app.engine", test_engine):
         response = client.get("/api/profile", headers=fake_headers)
 
     assert response.status_code == 200
@@ -303,7 +304,7 @@ def test_persistence(tmp_path):
         "address": "here",
         "phone": "(555) 393-9393",
     }
-    with patch("app.engine", test_engine):
+    with patch("jobrec.app.engine", test_engine):
         response = client.post(
             "/api/onboarding", data=personal_data, headers=fake_headers
         )
@@ -313,7 +314,7 @@ def test_persistence(tmp_path):
     del client
     app.config["TESTING"] = True
     client = app.test_client()
-    with patch("app.engine", test_engine):
+    with patch("jobrec.app.engine", test_engine):
         response = client.get("/api/profile", headers=fake_headers)
 
     assert response.status_code == 200
@@ -356,7 +357,7 @@ def test_api_returns_correct_personals(tmp_path):
         app.config["TESTING"] = True
         client = app.test_client()
 
-        with patch("app.engine", test_engine):
+        with patch("jobrec.app.engine", test_engine):
             response = client.get("/api/profile", headers=fake_headers)
 
         assert response.status_code == 200

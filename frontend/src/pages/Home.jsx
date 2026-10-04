@@ -1,8 +1,20 @@
+import { getVersion } from "../api/version.js";
 import Navbar from "../components/Navbar.jsx";
 import { useAuth0 } from "@auth0/auth0-react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
-  const { isAuthenticated, isLoading, user, loginWithRedirect, logout } = useAuth0();
+  
+  const { isAuthenticated, isLoading, user } = useAuth0();
+  const [version, setVersion] = useState(null);
+  useEffect(() => {
+      getVersion()
+        .then(setVersion)
+        .catch((err) => {
+          console.error(err);
+        });
+    }, []);
+
   return (
     <div className="flex flex-col items-center min-h-screen text-center">
       <Navbar />
@@ -14,7 +26,7 @@ export default function Home() {
         Sharvari Deshpande, Luna Brown, Luke McCartney, and Pranav Putta
       </div>
       <div>
-        using {app_base_url} for backend
+        using {app_base_url} {version} for backend
       </div>
       <div>
         {isLoading ? 
