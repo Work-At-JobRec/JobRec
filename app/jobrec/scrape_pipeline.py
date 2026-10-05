@@ -5,16 +5,18 @@ from typing import Iterable
 
 from sqlalchemy import Engine
 
-from job_normalization import normalize_listings
-from job_store import UpsertResult, upsert_listings
-from job_validation import filter_valid_listings
-from scraper_base import BaseScraper
-from scraper_runner import fetch_all
+from jobrec.job_normalization import normalize_listings
+from jobrec.job_store import UpsertResult, upsert_listings
+from jobrec.job_validation import filter_valid_listings
+from jobrec.scraper_base import BaseScraper
+from jobrec.scraper_runner import fetch_all
 
 logger = logging.getLogger(__name__)
 
 
-def run_scrape_pipeline(engine: Engine, scrapers: Iterable[BaseScraper]) -> UpsertResult:
+def run_scrape_pipeline(
+    engine: Engine, scrapers: Iterable[BaseScraper]
+) -> UpsertResult:
     """Fetch jobs from every scraper, normalize and validate them, and store the result.
 
     Sources that fail are skipped (already logged by the scrapers), invalid listings
@@ -26,6 +28,9 @@ def run_scrape_pipeline(engine: Engine, scrapers: Iterable[BaseScraper]) -> Upse
     result = upsert_listings(engine, valid)
     logger.info(
         "Scrape pipeline: %d fetched, %d valid, %d new, %d already stored",
-        len(fetched), len(valid), result.inserted, result.existing,
+        len(fetched),
+        len(valid),
+        result.inserted,
+        result.existing,
     )
     return result

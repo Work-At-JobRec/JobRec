@@ -13,8 +13,8 @@ from typing import Any, Optional
 
 import requests
 
-from job_listing import JobListing
-from scraper_base import BaseScraper
+from jobrec.job_listing import JobListing
+from jobrec.scraper_base import BaseScraper
 
 LEVER_POSTINGS_URL = "https://api.lever.co/v0/postings/{company}"
 
@@ -79,7 +79,9 @@ class LeverScraper(BaseScraper):
         for section in posting.get("lists") or []:
             if isinstance(section, dict):
                 heading = section.get("text") or ""
-                parts.append(f"<h3>{heading}</h3><ul>{section.get('content') or ''}</ul>")
+                parts.append(
+                    f"<h3>{heading}</h3><ul>{section.get('content') or ''}</ul>"
+                )
         parts.append(posting.get("additional") or "")
         return "\n".join(part for part in parts if part)
 

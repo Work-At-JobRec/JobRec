@@ -15,10 +15,10 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-from ashby_scraper import ASHBY_JOB_BOARD_URL, AshbyScraper, format_compensation  # noqa: E402
-from job_listing import JobListing  # noqa: E402
-from job_sources import JobSource, build_scraper, load_sources  # noqa: E402
-from scraper_base import ScraperRequestError  # noqa: E402
+from jobrec.ashby_scraper import ASHBY_JOB_BOARD_URL, AshbyScraper, format_compensation  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_sources import DEFAULT_SOURCES_PATH, JobSource, build_scraper, load_sources  # noqa: E402
+from jobrec.scraper_base import ScraperRequestError  # noqa: E402
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "ashby_jobs.json"
 BOARD_URL = ASHBY_JOB_BOARD_URL.format(organization="acme")
@@ -116,7 +116,7 @@ def test_empty_or_unexpected_payload_returns_empty_list():
 
 # One job that cannot be mapped is skipped instead of losing the whole board
 def test_job_that_cannot_be_mapped_is_skipped(caplog):
-    caplog.set_level(logging.WARNING, logger="scraper_base")
+    caplog.set_level(logging.WARNING, logger="jobrec.scraper_base")
     payload = load_fixture()
     payload["jobs"].insert(1, {"id": "bad", "title": 123, "jobUrl": "https://jobs.ashbyhq.com/acme/bad"})
 
@@ -182,6 +182,6 @@ def test_registry_builds_an_ashby_scraper():
 
 # The demo registry includes Ashby companies and still loads
 def test_demo_registry_includes_ashby_sources():
-    sources = load_sources(os.path.join(SRC_DIR, "job_sources_demo.json"))
+    sources = load_sources(DEFAULT_SOURCES_PATH.parent / "job_sources_demo.json")
 
     assert any(source.scraper == "ashby" for source in sources)

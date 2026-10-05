@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import sqlalchemy
-from db import Base  # noqa: F401  (re-exported: app.py and tests import Base from here)
+from jobrec.db import (
+    Base,
+)  # noqa: F401  (re-exported: app.py and tests import Base from here)
 
 _ = load_dotenv()
 
@@ -167,7 +169,8 @@ def parse_resume(filename: str) -> UserInfo | None:
     )
 
     return response.output_parsed
- 
+
+
 def update_user_info(
     user_id: str,
     name: str | None,

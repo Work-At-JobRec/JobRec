@@ -3,13 +3,16 @@ import sys
 from datetime import datetime, timezone
 
 # Lets this test import app/src/job_normalization.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
-from job_normalization import clean_text, normalize_listing, normalize_listings, normalize_url  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_normalization import (
+    clean_text,
+    normalize_listing,
+    normalize_listings,
+    normalize_url,
+)  # noqa: E402
 
 
 def make_listing(**overrides) -> JobListing:
@@ -24,6 +27,7 @@ def make_listing(**overrides) -> JobListing:
 
 
 # --- text fields ---
+
 
 # Extra whitespace inside and around the title is removed
 def test_title_whitespace_collapsed_and_stripped():
@@ -51,9 +55,12 @@ def test_location_none_stays_none():
 
 # --- description ---
 
+
 # HTML tags are removed and the words are kept
 def test_description_html_tags_removed_text_kept():
-    text = clean_text("<h2><strong>Who we are</strong></h2><p>Acme builds <em>payments</em> tooling.</p>")
+    text = clean_text(
+        "<h2><strong>Who we are</strong></h2><p>Acme builds <em>payments</em> tooling.</p>"
+    )
 
     assert "<" not in text and ">" not in text
     assert "Who we are" in text
@@ -72,7 +79,9 @@ def test_description_br_becomes_single_line_break():
 
 # List items become dashed lines, even when the item wraps its text in a paragraph
 def test_description_list_items_prefixed():
-    assert clean_text("<ul><li>Python</li><li><p>SQL</p></li></ul>") == "- Python\n- SQL"
+    assert (
+        clean_text("<ul><li>Python</li><li><p>SQL</p></li></ul>") == "- Python\n- SQL"
+    )
 
 
 # HTML entities and non-breaking spaces are decoded
@@ -82,7 +91,9 @@ def test_description_entities_and_nbsp_decoded():
 
 # Script and style contents never reach the description
 def test_description_script_and_style_dropped():
-    text = clean_text("<style>p{color:red}</style><p>Hello</p><script>alert(1)</script>")
+    text = clean_text(
+        "<style>p{color:red}</style><p>Hello</p><script>alert(1)</script>"
+    )
 
     assert text == "Hello"
 
@@ -94,12 +105,18 @@ def test_description_trailing_text_without_closing_tag_kept():
 
 # Plain text keeps its own line breaks
 def test_plain_text_description_newlines_preserved():
-    assert clean_text("Line one\nLine two\n\nLine three") == "Line one\nLine two\n\nLine three"
+    assert (
+        clean_text("Line one\nLine two\n\nLine three")
+        == "Line one\nLine two\n\nLine three"
+    )
 
 
 # Plain text that merely contains a less-than sign is not treated as HTML
 def test_plain_text_with_angle_bracket_is_not_parsed_as_html():
-    assert clean_text("Must have a < 5 minute response & C++") == "Must have a < 5 minute response & C++"
+    assert (
+        clean_text("Must have a < 5 minute response & C++")
+        == "Must have a < 5 minute response & C++"
+    )
 
 
 # Long runs of blank lines are reduced to one blank line
@@ -114,6 +131,7 @@ def test_empty_description_stays_empty():
 
 
 # --- application URL ---
+
 
 # Surrounding whitespace is removed and the scheme and host are lowercased; the path is untouched
 def test_url_stripped_and_scheme_host_lowercased():
@@ -161,6 +179,7 @@ def test_unparseable_url_returned_unchanged():
 
 
 # --- whole listing ---
+
 
 # Normalizing returns a new listing and never changes the one passed in
 def test_normalize_returns_copy_and_leaves_original_untouched():
@@ -211,7 +230,10 @@ def test_normalize_listings_maps_all_in_order():
 
 # Extra whitespace inside a pay value is removed; a blank pay value means no pay
 def test_pay_whitespace_collapsed_and_blank_becomes_none():
-    assert normalize_listing(make_listing(pay="  USD  100,000-120,000 \n(Base) ")).pay == "USD 100,000-120,000 (Base)"
+    assert (
+        normalize_listing(make_listing(pay="  USD  100,000-120,000 \n(Base) ")).pay
+        == "USD 100,000-120,000 (Base)"
+    )
     assert normalize_listing(make_listing(pay="   ")).pay is None
     assert normalize_listing(make_listing(pay=None)).pay is None
 

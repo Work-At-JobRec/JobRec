@@ -10,7 +10,7 @@ import logging
 from typing import Iterable
 from urllib.parse import urlsplit
 
-from job_listing import JobListing
+from jobrec.job_listing import JobListing
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,10 @@ def filter_valid_listings(listings: Iterable[JobListing]) -> list[JobListing]:
         if problems:
             logger.warning(
                 "Skipping invalid job listing (source=%s, source_job_id=%s, url=%r): %s",
-                listing.source or "?", listing.source_job_id, listing.application_url, "; ".join(problems),
+                listing.source or "?",
+                listing.source_job_id,
+                listing.application_url,
+                "; ".join(problems),
             )
         else:
             valid.append(listing)
@@ -81,5 +84,9 @@ def only_open_listings(listings: Iterable[JobListing]) -> list[JobListing]:
         else:
             dropped += 1
     if dropped:
-        logger.info("Dropped %d closed job listing(s); %d open listing(s) kept", dropped, len(kept))
+        logger.info(
+            "Dropped %d closed job listing(s); %d open listing(s) kept",
+            dropped,
+            len(kept),
+        )
     return kept

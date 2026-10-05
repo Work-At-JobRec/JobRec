@@ -11,9 +11,9 @@ from typing import Any, Optional
 
 import requests
 
-from greenhouse_scraper import parse_iso8601
-from job_listing import JobListing
-from scraper_base import BaseScraper
+from jobrec.greenhouse_scraper import parse_iso8601
+from jobrec.job_listing import JobListing
+from jobrec.scraper_base import BaseScraper
 
 ASHBY_JOB_BOARD_URL = "https://api.ashbyhq.com/posting-api/job-board/{organization}"
 

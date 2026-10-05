@@ -10,16 +10,19 @@ import pytest
 import requests
 
 # Lets this test import app/src/greenhouse_scraper.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
-from greenhouse_scraper import GreenhouseScraper, GREENHOUSE_JOBS_URL, format_pay_ranges, parse_iso8601  # noqa: E402
-from job_validation import filter_valid_listings  # noqa: E402
-from scraper_base import ScraperRequestError  # noqa: E402
-from scraper_runner import fetch_all  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.greenhouse_scraper import (
+    GreenhouseScraper,
+    GREENHOUSE_JOBS_URL,
+    format_pay_ranges,
+    parse_iso8601,
+)  # noqa: E402
+from jobrec.job_validation import filter_valid_listings  # noqa: E402
+from jobrec.scraper_base import ScraperRequestError  # noqa: E402
+from jobrec.scraper_runner import fetch_all  # noqa: E402
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "greenhouse_jobs.json"
 
@@ -76,7 +79,9 @@ def test_complete_job_maps_every_field():
     assert job.application_url == "https://acme.com/jobs?gh_jid=4012345"
     assert job.source == "greenhouse"
     assert job.source_job_id == "4012345"
-    assert job.posted_at == datetime(2026, 9, 3, 13, 30, 34, tzinfo=timezone(timedelta(hours=-4)))
+    assert job.posted_at == datetime(
+        2026, 9, 3, 13, 30, 34, tzinfo=timezone(timedelta(hours=-4))
+    )
 
 
 # Greenhouse returns the description HTML-escaped; the scraper decodes it to real HTML
@@ -133,7 +138,9 @@ def test_missing_jobs_key_returns_empty_list():
 
 # Timestamp parsing accepts the "Z" UTC suffix that Python 3.10 cannot parse natively
 def test_parse_iso8601_accepts_z_suffix():
-    assert parse_iso8601("2026-09-10T08:00:00Z") == datetime(2026, 9, 10, 8, 0, 0, tzinfo=timezone.utc)
+    assert parse_iso8601("2026-09-10T08:00:00Z") == datetime(
+        2026, 9, 10, 8, 0, 0, tzinfo=timezone.utc
+    )
 
 
 # Timestamp parsing keeps explicit UTC offsets
@@ -153,8 +160,12 @@ def test_parse_iso8601_invalid_or_missing_returns_none():
 # One job that cannot be mapped is skipped instead of losing the whole board
 def test_fetch_jobs_skips_job_that_cannot_be_mapped():
     payload = load_fixture()
-    payload["jobs"].insert(1, {"id": 999, "title": 123, "absolute_url": "https://acme.com/jobs?gh_jid=999"})
-    payload["jobs"].insert(2, {"id": 998, "title": "Bad location", "location": "Dublin"})
+    payload["jobs"].insert(
+        1, {"id": 999, "title": 123, "absolute_url": "https://acme.com/jobs?gh_jid=999"}
+    )
+    payload["jobs"].insert(
+        2, {"id": 998, "title": "Bad location", "location": "Dublin"}
+    )
 
     jobs = make_scraper(payload=payload).fetch_jobs()
 
@@ -163,7 +174,9 @@ def test_fetch_jobs_skips_job_that_cannot_be_mapped():
 
 # --- malformed listings and failed requests (#28) ---
 
-MALFORMED_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "greenhouse_jobs_malformed.json"
+MALFORMED_FIXTURE_PATH = (
+    Path(__file__).parent / "fixtures" / "greenhouse_jobs_malformed.json"
+)
 BOARD_URL = GREENHOUSE_JOBS_URL.format(board_token="acme")
 
 
@@ -178,9 +191,13 @@ def make_failing_session(exc=None, status=None, bad_json=False) -> Mock:
     response = Mock()
     if status is not None:
         error_response = Mock(status_code=status)
-        response.raise_for_status.side_effect = requests.HTTPError(f"{status} Error", response=error_response)
+        response.raise_for_status.side_effect = requests.HTTPError(
+            f"{status} Error", response=error_response
+        )
     if bad_json:
-        response.json.side_effect = ValueError("Expecting value: line 1 column 1 (char 0)")
+        response.json.side_effect = ValueError(
+            "Expecting value: line 1 column 1 (char 0)"
+        )
     session = Mock()
     session.get.return_value = response
     session.get.side_effect = exc
@@ -191,20 +208,30 @@ def make_failing_session(exc=None, status=None, bad_json=False) -> Mock:
 def test_job_missing_title_is_rejected_by_validation(caplog):
     caplog.set_level(logging.WARNING, logger="job_validation")
 
-    accepted = filter_valid_listings(make_scraper(payload=load_malformed_fixture()).fetch_jobs())
+    accepted = filter_valid_listings(
+        make_scraper(payload=load_malformed_fixture()).fetch_jobs()
+    )
 
     assert "5000002" not in [job.source_job_id for job in accepted]
-    assert any("5000002" in r.getMessage() and "title" in r.getMessage() for r in caplog.records)
+    assert any(
+        "5000002" in r.getMessage() and "title" in r.getMessage()
+        for r in caplog.records
+    )
 
 
 # A job with no application URL is rejected by validation, and the rejection names the job
 def test_job_missing_application_url_is_rejected_by_validation(caplog):
     caplog.set_level(logging.WARNING, logger="job_validation")
 
-    accepted = filter_valid_listings(make_scraper(payload=load_malformed_fixture()).fetch_jobs())
+    accepted = filter_valid_listings(
+        make_scraper(payload=load_malformed_fixture()).fetch_jobs()
+    )
 
     assert "5000003" not in [job.source_job_id for job in accepted]
-    assert any("5000003" in r.getMessage() and "application_url" in r.getMessage() for r in caplog.records)
+    assert any(
+        "5000003" in r.getMessage() and "application_url" in r.getMessage()
+        for r in caplog.records
+    )
 
 
 # Jobs whose fields have the wrong type are skipped and logged without losing the rest of the board
@@ -222,7 +249,9 @@ def test_job_with_wrong_field_types_is_skipped_not_fatal(caplog):
 
 # From a board full of bad data, only the well-formed job reaches the application
 def test_only_wellformed_jobs_survive_malformed_board():
-    accepted = filter_valid_listings(make_scraper(payload=load_malformed_fixture()).fetch_jobs())
+    accepted = filter_valid_listings(
+        make_scraper(payload=load_malformed_fixture()).fetch_jobs()
+    )
 
     assert len(accepted) == 1
     assert accepted[0].source_job_id == "5000001"
@@ -231,7 +260,9 @@ def test_only_wellformed_jobs_survive_malformed_board():
 
 # A dropped connection is reported as a ScraperRequestError that carries the board URL
 def test_connection_error_raises_scraper_request_error_with_board_url():
-    scraper = GreenhouseScraper("acme", session=make_failing_session(exc=requests.ConnectionError("refused")))
+    scraper = GreenhouseScraper(
+        "acme", session=make_failing_session(exc=requests.ConnectionError("refused"))
+    )
 
     with pytest.raises(ScraperRequestError) as excinfo:
         scraper.fetch_jobs()
@@ -242,7 +273,9 @@ def test_connection_error_raises_scraper_request_error_with_board_url():
 
 # A request that times out is reported as a ScraperRequestError
 def test_timeout_raises_scraper_request_error():
-    scraper = GreenhouseScraper("acme", session=make_failing_session(exc=requests.Timeout("timed out")))
+    scraper = GreenhouseScraper(
+        "acme", session=make_failing_session(exc=requests.Timeout("timed out"))
+    )
 
     with pytest.raises(ScraperRequestError):
         scraper.fetch_jobs()
@@ -282,7 +315,9 @@ def test_failed_board_is_logged_with_url(caplog):
 
 # When one board fails, the jobs from the other boards are still returned
 def test_fetch_all_skips_failed_board_and_returns_other_boards_jobs():
-    down = GreenhouseScraper("down", session=make_failing_session(exc=requests.ConnectionError("refused")))
+    down = GreenhouseScraper(
+        "down", session=make_failing_session(exc=requests.ConnectionError("refused"))
+    )
     healthy = make_scraper()
 
     jobs = fetch_all([down, healthy])
@@ -293,9 +328,17 @@ def test_fetch_all_skips_failed_board_and_returns_other_boards_jobs():
 
 # --- pay and status (#65) ---
 
+
 # A published salary range is turned into one readable line
 def test_format_pay_ranges_single_range():
-    ranges = [{"min_cents": 16500000, "max_cents": 19000000, "currency_type": "USD", "title": "Annual Base Salary Range:"}]
+    ranges = [
+        {
+            "min_cents": 16500000,
+            "max_cents": 19000000,
+            "currency_type": "USD",
+            "title": "Annual Base Salary Range:",
+        }
+    ]
 
     assert format_pay_ranges(ranges) == "USD 165,000-190,000 (Annual Base Salary Range)"
 
@@ -303,16 +346,34 @@ def test_format_pay_ranges_single_range():
 # Several ranges are joined so none of the published information is lost
 def test_format_pay_ranges_multiple_ranges_joined():
     ranges = [
-        {"min_cents": 10000000, "max_cents": 12000000, "currency_type": "USD", "title": "Base:"},
-        {"min_cents": 1000000, "max_cents": 2000000, "currency_type": "USD", "title": "Bonus"},
+        {
+            "min_cents": 10000000,
+            "max_cents": 12000000,
+            "currency_type": "USD",
+            "title": "Base:",
+        },
+        {
+            "min_cents": 1000000,
+            "max_cents": 2000000,
+            "currency_type": "USD",
+            "title": "Bonus",
+        },
     ]
 
-    assert format_pay_ranges(ranges) == "USD 100,000-120,000 (Base); USD 10,000-20,000 (Bonus)"
+    assert (
+        format_pay_ranges(ranges)
+        == "USD 100,000-120,000 (Base); USD 10,000-20,000 (Bonus)"
+    )
 
 
 # A range without a title still reads sensibly
 def test_format_pay_ranges_without_title():
-    assert format_pay_ranges([{"min_cents": 5000000, "max_cents": 7500000, "currency_type": "EUR"}]) == "EUR 50,000-75,000"
+    assert (
+        format_pay_ranges(
+            [{"min_cents": 5000000, "max_cents": 7500000, "currency_type": "EUR"}]
+        )
+        == "EUR 50,000-75,000"
+    )
 
 
 # No published pay means no pay value, never an empty string
@@ -324,9 +385,19 @@ def test_format_pay_ranges_empty_or_missing_returns_none():
 # Entries that are not well-formed are ignored instead of breaking the listing
 def test_format_pay_ranges_skips_malformed_entries():
     ranges = [
-        {"min_cents": "lots", "max_cents": None, "currency_type": "USD", "title": "Broken"},
+        {
+            "min_cents": "lots",
+            "max_cents": None,
+            "currency_type": "USD",
+            "title": "Broken",
+        },
         "not a dict",
-        {"min_cents": 5000000, "max_cents": 6000000, "currency_type": "USD", "title": "Good"},
+        {
+            "min_cents": 5000000,
+            "max_cents": 6000000,
+            "currency_type": "USD",
+            "title": "Good",
+        },
     ]
 
     assert format_pay_ranges(ranges) == "USD 50,000-60,000 (Good)"
@@ -376,7 +447,9 @@ def test_job_with_unparseable_deadline_stays_open():
 
 # --- only open listings (#66) ---
 
-OPEN_CLOSED_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "greenhouse_jobs_open_closed.json"
+OPEN_CLOSED_FIXTURE_PATH = (
+    Path(__file__).parent / "fixtures" / "greenhouse_jobs_open_closed.json"
+)
 FIXTURE_NOW = datetime(2026, 9, 27, tzinfo=timezone.utc)
 
 

@@ -16,13 +16,13 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Engine
 
-from ashby_scraper import AshbyScraper
-from greenhouse_scraper import GreenhouseScraper
-from job_store import UpsertResult
-from lever_scraper import LeverScraper
-from scrape_pipeline import run_scrape_pipeline
-from scraper_base import BaseScraper
-from workday_scraper import WorkdayScraper
+from jobrec.ashby_scraper import AshbyScraper
+from jobrec.greenhouse_scraper import GreenhouseScraper
+from jobrec.job_store import UpsertResult
+from jobrec.lever_scraper import LeverScraper
+from jobrec.scrape_pipeline import run_scrape_pipeline
+from jobrec.scraper_base import BaseScraper
+from jobrec.workday_scraper import WorkdayScraper
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +38,30 @@ SCRAPER_TYPES: dict[str, type] = {
 
 
 class JobSource(BaseModel):
-    scraper: str = Field(..., description='Which scraper handles this source, e.g. "greenhouse" or "lever"')
-    id: str = Field(..., min_length=1, description="The source's identifier for that scraper, such as a board token")
-    company_name: Optional[str] = Field(
-        None, description="Display name of the company; the scraper's own value is used if empty"
+    scraper: str = Field(
+        ...,
+        description='Which scraper handles this source, e.g. "greenhouse" or "lever"',
     )
-    enabled: bool = Field(True, description="Disabled sources stay in the registry but are not scraped")
+    id: str = Field(
+        ...,
+        min_length=1,
+        description="The source's identifier for that scraper, such as a board token",
+    )
+    company_name: Optional[str] = Field(
+        None,
+        description="Display name of the company; the scraper's own value is used if empty",
+    )
+    enabled: bool = Field(
+        True, description="Disabled sources stay in the registry but are not scraped"
+    )
 
     @field_validator("scraper")
     @classmethod
     def _known_scraper(cls, value: str) -> str:
         if value not in SCRAPER_TYPES:
-            raise ValueError(f"unknown scraper {value!r}; expected one of {sorted(SCRAPER_TYPES)}")
+            raise ValueError(
+                f"unknown scraper {value!r}; expected one of {sorted(SCRAPER_TYPES)}"
+            )
         return value
 
     @property
@@ -71,7 +83,9 @@ def build_scraper(source: JobSource) -> BaseScraper:
     return scraper_class(source.id, company_name=source.company_name)
 
 
-def scrape_all(engine: Engine, sources: list[JobSource]) -> list[tuple[str, UpsertResult]]:
+def scrape_all(
+    engine: Engine, sources: list[JobSource]
+) -> list[tuple[str, UpsertResult]]:
     """Scrape every enabled source into the database, returning (source name, result) per source in order."""
     results: list[tuple[str, UpsertResult]] = []
     for source in sources:
@@ -80,9 +94,15 @@ def scrape_all(engine: Engine, sources: list[JobSource]) -> list[tuple[str, Upse
             continue
         result = run_scrape_pipeline(engine, [build_scraper(source)])
         logger.info(
-            "Source %s: %d new, %d updated, %d unchanged", source.name, result.inserted, result.updated, result.unchanged,
+            "Source %s: %d new, %d updated, %d unchanged",
+            source.name,
+            result.inserted,
+            result.updated,
+            result.unchanged,
         )
         results.append((source.name, result))
     total_new = sum(result.inserted for _, result in results)
-    logger.info("Scraped %d source(s): %d new listing(s) stored", len(results), total_new)
+    logger.info(
+        "Scraped %d source(s): %d new listing(s) stored", len(results), total_new
+    )
     return results
