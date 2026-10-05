@@ -11,14 +11,12 @@ import pytest
 import requests
 
 # Lets this test import app/src/workday_scraper.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
-from scraper_base import ScraperRequestError  # noqa: E402
-from workday_scraper import WorkdayScraper, parse_workday_date  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.scraper_base import ScraperRequestError  # noqa: E402
+from jobrec.workday_scraper import WorkdayScraper, parse_workday_date  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BOARD = "acme.wd5.myworkdayjobs.com/AcmeExternalCareerSite"
@@ -48,7 +46,12 @@ def make_postings(count: int) -> list[dict]:
     return postings
 
 
-def make_session(postings: list[dict], page_size: int, failing_paths: set = (), detail_overrides: dict = None) -> Mock:
+def make_session(
+    postings: list[dict],
+    page_size: int,
+    failing_paths: set = (),
+    detail_overrides: dict = None,
+) -> Mock:
     """A stand-in session: POST returns the page of postings at the requested offset, GET returns a detail per path."""
     detail_overrides = detail_overrides or {}
 
@@ -56,11 +59,14 @@ def make_session(postings: list[dict], page_size: int, failing_paths: set = (), 
         offset = json["offset"]
         response = Mock()
         response.raise_for_status.return_value = None
-        response.json.return_value = {"total": len(postings), "jobPostings": postings[offset:offset + page_size]}
+        response.json.return_value = {
+            "total": len(postings),
+            "jobPostings": postings[offset : offset + page_size],
+        }
         return response
 
     def get(url, params=None, timeout=None):
-        path = url[len(BASE_URL):]
+        path = url[len(BASE_URL) :]
         if path in failing_paths:
             raise requests.ConnectionError(f"refused for {path}")
         posting = next(p for p in postings if p["externalPath"] == path)
@@ -81,11 +87,17 @@ def make_session(postings: list[dict], page_size: int, failing_paths: set = (), 
 
 def make_scraper(postings=None, page_size=3, **kwargs) -> WorkdayScraper:
     postings = make_postings(7) if postings is None else postings
-    session = make_session(postings, page_size, kwargs.pop("failing_paths", ()), kwargs.pop("detail_overrides", None))
+    session = make_session(
+        postings,
+        page_size,
+        kwargs.pop("failing_paths", ()),
+        kwargs.pop("detail_overrides", None),
+    )
     return WorkdayScraper(BOARD, session=session, page_size=page_size, **kwargs)
 
 
 # --- board identifier ---
+
 
 # The board string "host/site" is split into the host, tenant, and site the endpoints need
 def test_board_string_is_parsed_into_host_tenant_and_site():
@@ -104,6 +116,7 @@ def test_board_string_without_site_is_rejected():
 
 # --- pagination ---
 
+
 # Every page is requested until the postings run out
 def test_fetch_jobs_pages_through_listing_until_exhausted():
     scraper = make_scraper(page_size=3)
@@ -111,7 +124,9 @@ def test_fetch_jobs_pages_through_listing_until_exhausted():
     jobs = scraper.fetch_jobs()
 
     assert len(jobs) == 7
-    offsets = [call.kwargs["json"]["offset"] for call in scraper.session.post.call_args_list]
+    offsets = [
+        call.kwargs["json"]["offset"] for call in scraper.session.post.call_args_list
+    ]
     assert offsets == [0, 3, 6]
 
 
@@ -133,7 +148,12 @@ def test_listing_request_shape():
 
     first = scraper.session.post.call_args_list[0]
     assert first.args[0] == BASE_URL + "/jobs"
-    assert first.kwargs["json"] == {"appliedFacets": {}, "limit": 3, "offset": 0, "searchText": ""}
+    assert first.kwargs["json"] == {
+        "appliedFacets": {},
+        "limit": 3,
+        "offset": 0,
+        "searchText": "",
+    }
     assert first.kwargs["timeout"] is not None
 
 
@@ -146,6 +166,7 @@ def test_empty_board_returns_empty_list():
 
 
 # --- field mapping ---
+
 
 # A posting's detail response maps onto every JobListing field
 def test_detail_maps_every_field():
@@ -173,13 +194,18 @@ def test_detail_maps_every_field():
 
 # Without a company name the tenant is used
 def test_company_name_falls_back_to_tenant():
-    assert make_scraper(postings=make_postings(1)).fetch_jobs()[0].company_name == "acme"
+    assert (
+        make_scraper(postings=make_postings(1)).fetch_jobs()[0].company_name == "acme"
+    )
 
 
 # A posting that Workday says can no longer be applied to is closed
 def test_can_apply_false_is_closed():
     postings = make_postings(2)
-    scraper = make_scraper(postings=postings, detail_overrides={postings[1]["externalPath"]: {"canApply": False}})
+    scraper = make_scraper(
+        postings=postings,
+        detail_overrides={postings[1]["externalPath"]: {"canApply": False}},
+    )
 
     jobs = scraper.fetch_jobs()
 
@@ -189,8 +215,16 @@ def test_can_apply_false_is_closed():
 # A detail response missing optional fields still yields a listing
 def test_detail_missing_optional_fields_tolerated():
     postings = make_postings(1)
-    postings[0]["locationsText"] = None  # neither the listing page nor the detail names a location
-    overrides = {postings[0]["externalPath"]: {"startDate": None, "location": None, "jobDescription": None}}
+    postings[0][
+        "locationsText"
+    ] = None  # neither the listing page nor the detail names a location
+    overrides = {
+        postings[0]["externalPath"]: {
+            "startDate": None,
+            "location": None,
+            "jobDescription": None,
+        }
+    }
     scraper = make_scraper(postings=postings, detail_overrides=overrides)
 
     job = scraper.fetch_jobs()[0]
@@ -202,11 +236,14 @@ def test_detail_missing_optional_fields_tolerated():
 
 # --- failures ---
 
+
 # A posting whose detail cannot be fetched is skipped and logged; the rest are kept
 def test_detail_failure_skips_posting_and_keeps_rest(caplog):
     caplog.set_level(logging.WARNING, logger="workday_scraper")
     postings = make_postings(3)
-    scraper = make_scraper(postings=postings, failing_paths={postings[1]["externalPath"]})
+    scraper = make_scraper(
+        postings=postings, failing_paths={postings[1]["externalPath"]}
+    )
 
     jobs = scraper.fetch_jobs()
 
@@ -228,8 +265,11 @@ def test_listing_failure_raises_scraper_request_error():
 
 # --- helpers ---
 
+
 # Workday start dates are plain dates and become UTC midnight datetimes
 def test_parse_workday_date():
-    assert parse_workday_date("2026-09-28") == datetime(2026, 9, 28, tzinfo=timezone.utc)
+    assert parse_workday_date("2026-09-28") == datetime(
+        2026, 9, 28, tzinfo=timezone.utc
+    )
     assert parse_workday_date(None) is None
     assert parse_workday_date("Posted Today") is None

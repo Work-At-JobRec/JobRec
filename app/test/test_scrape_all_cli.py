@@ -7,12 +7,12 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-import job_sources  # noqa: E402
-from job_listing import JobListing  # noqa: E402
-from job_sources import JobSource  # noqa: E402
-from job_store import count_listings  # noqa: E402
-from scrape_all import exit_code, scrape_sources  # noqa: E402
-from scraper_base import BaseScraper  # noqa: E402
+import jobrec.job_sources as job_sources  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_sources import JobSource  # noqa: E402
+from jobrec.job_store import count_listings  # noqa: E402
+from jobrec.scrape_all import exit_code, scrape_sources  # noqa: E402
+from jobrec.scraper_base import BaseScraper  # noqa: E402
 
 
 class FakeScraper(BaseScraper):
@@ -57,7 +57,7 @@ def test_disabled_sources_are_skipped(engine, monkeypatch):
 
 # The demo registry the scheduled scrape uses loads, and every entry names a scraper that can be built
 def test_demo_registry_loads_and_every_entry_builds_a_scraper():
-    demo_path = os.path.join(SRC_DIR, "job_sources_demo.json")
+    demo_path = os.path.join(os.path.dirname(job_sources.__file__), "job_sources_demo.json")
 
     sources = job_sources.load_sources(demo_path)
 

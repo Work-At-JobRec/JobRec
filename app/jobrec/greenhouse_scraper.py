@@ -12,8 +12,8 @@ from typing import Any, Optional
 
 import requests
 
-from job_listing import JobListing
-from scraper_base import BaseScraper
+from jobrec.job_listing import JobListing
+from jobrec.scraper_base import BaseScraper
 
 GREENHOUSE_JOBS_URL = "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs"
 
@@ -79,7 +79,9 @@ class GreenhouseScraper(BaseScraper):
     def fetch_jobs(self) -> list[JobListing]:
         url = GREENHOUSE_JOBS_URL.format(board_token=self.board_token)
         # pay_transparency adds the pay_input_ranges field to each job.
-        data = self._get_json(url, params={"content": "true", "pay_transparency": "true"})
+        data = self._get_json(
+            url, params={"content": "true", "pay_transparency": "true"}
+        )
         return self._build_listings(data.get("jobs") or [], self._to_listing)
 
     def _status(self, job: dict) -> str:
@@ -96,13 +98,17 @@ class GreenhouseScraper(BaseScraper):
         job_id = job.get("id")
         return JobListing(
             title=job.get("title") or "",
-            company_name=self.company_name or job.get("company_name") or self.board_token,
+            company_name=self.company_name
+            or job.get("company_name")
+            or self.board_token,
             location=location.get("name"),
             # Greenhouse returns the description HTML-escaped (&lt;p&gt;); decode it to real HTML.
             description=html.unescape(job.get("content") or ""),
             source=self.source_name,
             application_url=job.get("absolute_url") or "",
-            posted_at=parse_iso8601(job.get("first_published") or job.get("updated_at")),
+            posted_at=parse_iso8601(
+                job.get("first_published") or job.get("updated_at")
+            ),
             source_job_id=str(job_id) if job_id is not None else None,
             pay=format_pay_ranges(job.get("pay_input_ranges")),
             status=self._status(job),

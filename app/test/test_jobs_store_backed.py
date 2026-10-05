@@ -9,9 +9,9 @@ import pytest
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
-from job_store import get_listing, list_recent_listings, upsert_listings  # noqa: E402
-from jobs import LIST_DESCRIPTION_CHARS, get_job, get_jobs, infer_job_type, to_api_job  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_store import get_listing, list_recent_listings, upsert_listings  # noqa: E402
+from jobrec.jobs import LIST_DESCRIPTION_CHARS, get_job, get_jobs, infer_job_type, to_api_job  # noqa: E402
 
 API_FIELDS = {
     "id", "title", "company", "location", "description", "applicationUrl",

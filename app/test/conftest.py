@@ -1,11 +1,6 @@
 import os
-import sys
 
 import pytest
-
-# Lets fixtures import files from app/src
-SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
-sys.path.insert(0, SRC_DIR)
 
 
 def pytest_addoption(parser):
@@ -25,8 +20,8 @@ def engine(tmp_path):
     CI job), the same tests run against that database instead; its tables are dropped
     and recreated for each test, so the name must contain "test" to protect real data.
     """
-    from db import Base, make_engine
-    import job_store  # noqa: F401  (registers the job_listings table with Base)
+    from jobrec.db import Base, make_engine
+    import jobrec.job_store  # noqa: F401  (registers the job_listings table with Base)
 
     url = os.environ.get("TEST_DATABASE_URL")
     if url:

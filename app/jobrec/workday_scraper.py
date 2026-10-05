@@ -19,8 +19,8 @@ from typing import Any, Optional
 
 import requests
 
-from job_listing import JobListing
-from scraper_base import BaseScraper, ScraperRequestError
+from jobrec.job_listing import JobListing
+from jobrec.scraper_base import BaseScraper, ScraperRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +70,16 @@ class WorkdayScraper(BaseScraper):
     def fetch_jobs(self) -> list[JobListing]:
         postings = []
         for page in range(self.max_pages):
-            payload = {"appliedFacets": {}, "limit": self.page_size, "offset": page * self.page_size, "searchText": ""}
+            payload = {
+                "appliedFacets": {},
+                "limit": self.page_size,
+                "offset": page * self.page_size,
+                "searchText": "",
+            }
             data = self._post_json(f"{self.api_base}/jobs", payload)
-            page_postings = data.get("jobPostings") or [] if isinstance(data, dict) else []
+            page_postings = (
+                data.get("jobPostings") or [] if isinstance(data, dict) else []
+            )
             postings.extend(page_postings)
             if len(page_postings) < self.page_size:
                 break
@@ -85,11 +92,21 @@ class WorkdayScraper(BaseScraper):
             detail = self._get_json(self.api_base + path)
         except ScraperRequestError:
             # Already logged with its URL by _get_json; the rest of the board is still returned.
-            logger.warning("Skipping %s posting whose details could not be fetched: %s", self.source_name, path)
+            logger.warning(
+                "Skipping %s posting whose details could not be fetched: %s",
+                self.source_name,
+                path,
+            )
             raise ValueError(f"details unavailable for {path}")
-        info = (detail.get("jobPostingInfo") if isinstance(detail, dict) else None) or {}
+        info = (
+            detail.get("jobPostingInfo") if isinstance(detail, dict) else None
+        ) or {}
         bullet_fields = posting.get("bulletFields") or []
-        job_id = info.get("jobReqId") or (bullet_fields[0] if bullet_fields else None) or info.get("id")
+        job_id = (
+            info.get("jobReqId")
+            or (bullet_fields[0] if bullet_fields else None)
+            or info.get("id")
+        )
         return JobListing(
             title=info.get("title") or posting.get("title") or "",
             company_name=self.company_name or self.tenant,

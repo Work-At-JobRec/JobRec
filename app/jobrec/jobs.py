@@ -19,8 +19,8 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from job_listing import JobListing
-from job_store import count_listings, get_listing, list_recent_listings
+from jobrec.job_listing import JobListing
+from jobrec.job_store import count_listings, get_listing, list_recent_listings
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,11 @@ SAMPLE_MATCHES = {
         "requirements": [
             {"text": "Bachelors degree in", "skill": "computer science", "met": True},
             {"text": "Ability to work with", "skill": "Python", "met": True},
-            {"text": "Experience with the", "skill": "Microsoft Office Suite", "met": False},
+            {
+                "text": "Experience with the",
+                "skill": "Microsoft Office Suite",
+                "met": False,
+            },
         ],
     },
     "sample-2": {

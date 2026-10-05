@@ -7,7 +7,7 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-from db import make_engine  # noqa: E402
+from jobrec.db import make_engine  # noqa: E402
 
 
 # Hosting providers hand out postgres:// URLs, which SQLAlchemy does not accept as written
