@@ -22,8 +22,8 @@ jobs:
     - name: Create Release
       env:
         GH_TOKEN: ${{ github.token }}
-      run:
-        python -m pip install poetry
-        cd app
-        version=$(python -m poetry version -s)
-        gh release create "v$version" -t "JobRec v$version" --generate-notes
+      run: |
+        python -m pip install poetry;
+        cd app;
+        version=$(python -m poetry version -s);
+        gh release create "v$version" -t "JobRec v$version" --generate-notes;

@@ -13,14 +13,14 @@ import requests
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from jobrec.job_listing import JobListing  # noqa: E402
-from jobrec.lever_scraper import (
+from app.jobrec.job_listing import JobListing  # noqa: E402
+from app.jobrec.lever_scraper import (
     LEVER_POSTINGS_URL,
     LeverScraper,
     format_salary_range,
     parse_epoch_millis,
 )  # noqa: E402
-from jobrec.scraper_base import ScraperRequestError  # noqa: E402
+from app.jobrec.scraper_base import ScraperRequestError  # noqa: E402
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "lever_postings.json"
 BOARD_URL = LEVER_POSTINGS_URL.format(company="acme")

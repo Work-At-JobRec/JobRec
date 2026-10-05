@@ -43,4 +43,3 @@ jobs:
       run: |
         cd app
         poetry run pytest test/
-    - name: 

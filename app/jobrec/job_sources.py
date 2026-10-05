@@ -16,12 +16,12 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Engine
 
-from jobrec.greenhouse_scraper import GreenhouseScraper
-from jobrec.job_store import UpsertResult
-from jobrec.lever_scraper import LeverScraper
-from jobrec.scrape_pipeline import run_scrape_pipeline
-from jobrec.scraper_base import BaseScraper
-from jobrec.workday_scraper import WorkdayScraper
+from app.jobrec.greenhouse_scraper import GreenhouseScraper
+from app.jobrec.job_store import UpsertResult
+from app.jobrec.lever_scraper import LeverScraper
+from app.jobrec.scrape_pipeline import run_scrape_pipeline
+from app.jobrec.scraper_base import BaseScraper
+from app.jobrec.workday_scraper import WorkdayScraper
 
 logger = logging.getLogger(__name__)
 

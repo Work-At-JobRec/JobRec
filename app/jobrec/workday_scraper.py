@@ -19,8 +19,8 @@ from typing import Any, Optional
 
 import requests
 
-from jobrec.job_listing import JobListing
-from jobrec.scraper_base import BaseScraper, ScraperRequestError
+from app.jobrec.job_listing import JobListing
+from app.jobrec.scraper_base import BaseScraper, ScraperRequestError
 
 logger = logging.getLogger(__name__)
 

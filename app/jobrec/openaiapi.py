@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import sqlalchemy
-from jobrec.db import (
+from app.jobrec.db import (
     Base,
 )  # noqa: F401  (re-exported: app.py and tests import Base from here)
 

@@ -14,9 +14,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
-from jobrec.db import Base
-from jobrec.job_sources import DEFAULT_SOURCES_PATH, load_sources, scrape_all
-from jobrec.job_store import (
+from app.jobrec.db import Base
+from app.jobrec.job_sources import DEFAULT_SOURCES_PATH, load_sources, scrape_all
+from app.jobrec.job_store import (
     JobListingTable,
     count_listings,
 )  # noqa: F401  (registers the table before create_all)

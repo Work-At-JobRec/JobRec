@@ -14,24 +14,24 @@ from flask import (
 from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
-from jobrec.openaiapi import (
+from app.jobrec.openaiapi import (
     UserInfoTable,
     update_skill_db,
     UserInfo,
     Base,
     update_user_info,
 )
-from jobrec.job_store import (
+from app.jobrec.job_store import (
     JobListingTable,
 )
 from threading import Thread
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
-import jobrec.auth as auth
-from jobrec.jobs import get_jobs, get_job
-from jobrec.auth import require_auth, get_user_id
-from jobrec.listing_search.find_listings import (
+import app.jobrec.auth as auth
+from app.jobrec.jobs import get_jobs, get_job
+from app.jobrec.auth import require_auth, get_user_id
+from app.jobrec.listing_search.find_listings import (
     find_percentile,
     find_skill_gaps,
     get_job_recommendations,

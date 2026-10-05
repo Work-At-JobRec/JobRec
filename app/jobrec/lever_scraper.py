@@ -13,8 +13,8 @@ from typing import Any, Optional
 
 import requests
 
-from jobrec.job_listing import JobListing
-from jobrec.scraper_base import BaseScraper
+from app.jobrec.job_listing import JobListing
+from app.jobrec.scraper_base import BaseScraper
 
 LEVER_POSTINGS_URL = "https://api.lever.co/v0/postings/{company}"
 

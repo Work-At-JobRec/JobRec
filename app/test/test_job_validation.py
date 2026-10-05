@@ -6,8 +6,8 @@ import sys
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from jobrec.job_listing import JobListing  # noqa: E402
-from jobrec.job_validation import (
+from app.jobrec.job_listing import JobListing  # noqa: E402
+from app.jobrec.job_validation import (
     filter_valid_listings,
     only_open_listings,
     validate_listing,

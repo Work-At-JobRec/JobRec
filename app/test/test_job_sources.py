@@ -11,7 +11,6 @@ from sqlalchemy import create_engine
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from jobrec.db import Base  # noqa: E402
 from jobrec.greenhouse_scraper import GreenhouseScraper  # noqa: E402
 from jobrec.job_listing import JobListing  # noqa: E402
 from jobrec.job_sources import (
@@ -25,6 +24,7 @@ from jobrec.job_store import count_listings, list_listings  # noqa: E402
 from jobrec.lever_scraper import LeverScraper  # noqa: E402
 from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
 from jobrec.workday_scraper import WorkdayScraper  # noqa: E402
+from jobrec.db import Base
 
 
 @pytest.fixture
