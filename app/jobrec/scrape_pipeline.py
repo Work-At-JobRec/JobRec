@@ -5,11 +5,11 @@ from typing import Iterable
 
 from sqlalchemy import Engine
 
-from app.jobrec.job_normalization import normalize_listings
-from app.jobrec.job_store import UpsertResult, upsert_listings
-from app.jobrec.job_validation import filter_valid_listings
-from app.jobrec.scraper_base import BaseScraper
-from app.jobrec.scraper_runner import fetch_all
+from jobrec.job_normalization import normalize_listings
+from jobrec.job_store import UpsertResult, upsert_listings
+from jobrec.job_validation import filter_valid_listings
+from jobrec.scraper_base import BaseScraper
+from jobrec.scraper_runner import fetch_all
 
 logger = logging.getLogger(__name__)
 

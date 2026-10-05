@@ -14,9 +14,9 @@ from typing import Iterable, Optional
 from sqlalchemy import DateTime, Engine, Integer, String, Text, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from app.jobrec.db import Base
-from app.jobrec.job_listing import JobListing
-from app.jobrec.job_normalization import normalize_url
+from jobrec.db import Base
+from jobrec.job_listing import JobListing
+from jobrec.job_normalization import normalize_url
 
 logger = logging.getLogger(__name__)
 

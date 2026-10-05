@@ -11,8 +11,8 @@ from typing import Any, Callable, Iterable, Optional
 
 import requests
 
-from app.jobrec.job_listing import JobListing
-from app.jobrec.job_validation import only_open_listings
+from jobrec.job_listing import JobListing
+from jobrec.job_validation import only_open_listings
 
 logger = logging.getLogger(__name__)
 

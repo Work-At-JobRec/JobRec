@@ -12,7 +12,7 @@ algorithm), so they're placeholders in SAMPLE_MATCHES until then.
 
 from datetime import datetime, timedelta, timezone
 
-from app.jobrec.job_listing import JobListing
+from jobrec.job_listing import JobListing
 
 _now = datetime.now(timezone.utc)
 

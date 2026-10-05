@@ -13,7 +13,7 @@ from html.parser import HTMLParser
 from typing import Iterable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
-from app.jobrec.job_listing import JobListing
+from jobrec.job_listing import JobListing
 
 # Tags that start a new line in the plain-text version of a description.
 _BLOCK_TAGS = {

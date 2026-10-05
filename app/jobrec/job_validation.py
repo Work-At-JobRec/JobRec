@@ -10,7 +10,7 @@ import logging
 from typing import Iterable
 from urllib.parse import urlsplit
 
-from app.jobrec.job_listing import JobListing
+from jobrec.job_listing import JobListing
 
 logger = logging.getLogger(__name__)
 

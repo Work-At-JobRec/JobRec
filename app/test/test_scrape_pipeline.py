@@ -8,15 +8,15 @@ from sqlalchemy import create_engine
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from app.jobrec.db import Base  # noqa: E402
-from app.jobrec.job_listing import JobListing  # noqa: E402
-from app.jobrec.job_store import (
+from jobrec.db import Base  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_store import (
     UpsertResult,
     count_listings,
     list_listings,
 )  # noqa: E402
-from app.jobrec.scrape_pipeline import run_scrape_pipeline  # noqa: E402
-from app.jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
+from jobrec.scrape_pipeline import run_scrape_pipeline  # noqa: E402
+from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
 
 
 @pytest.fixture
