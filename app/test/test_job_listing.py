@@ -6,12 +6,10 @@ import pytest
 from pydantic import ValidationError
 
 # Lets this test import app/src/job_listing.py
-SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "src")
-)
+SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, SRC_DIR)
 
-from job_listing import JobListing  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
 
 
 def make_listing(**overrides):

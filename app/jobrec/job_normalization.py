@@ -13,12 +13,28 @@ from html.parser import HTMLParser
 from typing import Iterable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
-from job_listing import JobListing
+from jobrec.job_listing import JobListing
 
 # Tags that start a new line in the plain-text version of a description.
 _BLOCK_TAGS = {
-    "p", "div", "br", "hr", "ul", "ol", "tr", "table", "section", "article",
-    "blockquote", "pre", "h1", "h2", "h3", "h4", "h5", "h6",
+    "p",
+    "div",
+    "br",
+    "hr",
+    "ul",
+    "ol",
+    "tr",
+    "table",
+    "section",
+    "article",
+    "blockquote",
+    "pre",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
 }
 # Tags whose contents are code or styling, never job information.
 _SKIPPED_TAGS = {"script", "style"}
@@ -33,7 +49,9 @@ class _TextExtractor(HTMLParser):
     """Collects the readable text of an HTML fragment, turning block structure into line breaks."""
 
     def __init__(self):
-        super().__init__(convert_charrefs=True)  # entities such as &amp; arrive already decoded
+        super().__init__(
+            convert_charrefs=True
+        )  # entities such as &amp; arrive already decoded
         self.parts: list[str] = []
         self._skip_depth = 0
 
@@ -78,10 +96,12 @@ def clean_text(value: Optional[str]) -> str:
     else:
         text = html.unescape(value)
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("​", "")
-    text = re.sub(r"[^\S\n]+", " ", text)          # runs of spaces, tabs, non-breaking spaces
-    text = re.sub(r" ?\n ?", "\n", text)           # no spaces hugging a line break
-    text = re.sub(r"(?m)^-\n+", "- ", text)        # <li><p>text</p></li> keeps its dash on the same line
-    text = re.sub(r"\n{3,}", "\n\n", text)         # at most one blank line in a row
+    text = re.sub(r"[^\S\n]+", " ", text)  # runs of spaces, tabs, non-breaking spaces
+    text = re.sub(r" ?\n ?", "\n", text)  # no spaces hugging a line break
+    text = re.sub(
+        r"(?m)^-\n+", "- ", text
+    )  # <li><p>text</p></li> keeps its dash on the same line
+    text = re.sub(r"\n{3,}", "\n\n", text)  # at most one blank line in a row
     return text.strip()
 
 
@@ -113,8 +133,10 @@ def normalize_url(url: Optional[str]) -> str:
         netloc = parts.netloc.rsplit("@", 1)[0] + "@" + netloc
     # Filter the raw pieces rather than re-encoding, so order and escaping stay byte-identical.
     query = "&".join(
-        piece for piece in parts.query.split("&")
-        if piece and not piece.split("=", 1)[0].lower().startswith(_TRACKING_PARAM_PREFIX)
+        piece
+        for piece in parts.query.split("&")
+        if piece
+        and not piece.split("=", 1)[0].lower().startswith(_TRACKING_PARAM_PREFIX)
     )
     return urlunsplit((parts.scheme.lower(), netloc, parts.path, query, ""))
 
@@ -123,14 +145,16 @@ def normalize_listing(listing: JobListing) -> JobListing:
     """Return a normalized copy of a listing. The listing passed in is not modified."""
     location = _collapse_whitespace(listing.location) if listing.location else ""
     pay = _collapse_whitespace(listing.pay) if listing.pay else ""
-    return listing.model_copy(update={
-        "title": _collapse_whitespace(listing.title),
-        "company_name": _collapse_whitespace(listing.company_name),
-        "location": location or None,
-        "description": clean_text(listing.description),
-        "application_url": normalize_url(listing.application_url),
-        "pay": pay or None,
-    })
+    return listing.model_copy(
+        update={
+            "title": _collapse_whitespace(listing.title),
+            "company_name": _collapse_whitespace(listing.company_name),
+            "location": location or None,
+            "description": clean_text(listing.description),
+            "application_url": normalize_url(listing.application_url),
+            "pay": pay or None,
+        }
+    )
 
 
 def normalize_listings(listings: Iterable[JobListing]) -> list[JobListing]:

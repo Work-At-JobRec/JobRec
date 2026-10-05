@@ -1,6 +1,6 @@
 """Scrape every source in the registry into the application database.
 
-Run from app/src:  python scrape_all.py [--sources path/to/job_sources.json]
+Run from app/:  python -m jobrec.scrape_all [--sources path/to/job_sources.json]
 
 Uses the same DATABASE_URL setting as the web app (local SQLite by default), so
 listings scraped here are what the application serves. Each source runs on its
@@ -18,10 +18,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import Engine
 
-from db import Base, make_engine
-from job_sources import DEFAULT_SOURCES_PATH, JobSource, load_sources
-from job_sources import scrape_all as scrape_registry
-from job_store import JobListingTable, UpsertResult, count_listings  # noqa: F401  (registers the table before create_all)
+from jobrec.db import Base, make_engine
+from jobrec.job_sources import DEFAULT_SOURCES_PATH, JobSource, load_sources
+from jobrec.job_sources import scrape_all as scrape_registry
+from jobrec.job_store import JobListingTable, UpsertResult, count_listings  # noqa: F401  (registers the table before create_all)
 
 logger = logging.getLogger(__name__)
 
