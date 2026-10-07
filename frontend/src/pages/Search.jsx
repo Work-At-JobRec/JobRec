@@ -4,7 +4,8 @@ import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
 import { ChevronDownIcon, FunnelIcon, SearchIcon } from "../components/Icons.jsx";
 import { fetchJobs } from "../api/jobs.js";
-import { EMPTY_FILTERS, POSITION_TYPES, filterJobs } from "../utils/filterJobs.js";
+import EmptyJobsState from "../components/EmptyJobsState.jsx";
+import { EMPTY_FILTERS, POSITION_TYPES, activeFilters, filterJobs } from "../utils/filterJobs.js";
 
 const pill = "border-[1.5px] border-black rounded-full px-4 py-0.5 bg-transparent outline-none";
 
@@ -170,6 +171,7 @@ export default function Search() {
 
   const update = (changes) => setFilters((current) => ({ ...current, ...changes }));
   const results = jobs && filterJobs(jobs, filters);
+  const active = activeFilters(filters);
 
   return (
     <div className="min-h-screen bg-white">
@@ -220,7 +222,38 @@ export default function Search() {
         <div className="flex flex-col gap-8 px-12" aria-live="polite">
           {error && <p className="text-2xl">{error}</p>}
           {!error && !results && <p className="text-2xl text-[#8a8a8a]">Loading jobs…</p>}
-          {results?.length === 0 && <p className="text-2xl">No jobs match your search.</p>}
+          {results?.length === 0 && (
+            <EmptyJobsState>
+              {active.length ? (
+                <>
+                  <p>Try removing a filter or broadening your search:</p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-3">
+                    {active.map(({ label, reset }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => update(reset)}
+                        aria-label={`Remove filter ${label}`}
+                        className="inline-flex items-center gap-2 border-[1.5px] border-black rounded-full px-4 py-1 text-lg text-black hover:border-[#E75A8F] hover:text-[#E75A8F]"
+                      >
+                        {label}
+                        <span aria-hidden="true">×</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFilters(EMPTY_FILTERS)}
+                    className="mt-6 bg-black text-white text-xl font-bold rounded-2xl px-6 py-2.5 hover:bg-[#E75A8F]"
+                  >
+                    Clear all filters
+                  </button>
+                </>
+              ) : (
+                <p>There are no job listings yet. Check back soon — new jobs are added regularly.</p>
+              )}
+            </EmptyJobsState>
+          )}
           {results?.map((job) => (
             <JobCard key={job.id} job={job} />
           ))}

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
+import EmptyJobsState from "../components/EmptyJobsState.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
 import { ChevronDownIcon, FunnelIcon } from "../components/Icons.jsx";
@@ -44,7 +46,21 @@ export default function Jobs() {
         <div className="flex flex-col gap-8 px-12">
           {error && <p className="text-2xl">{error}</p>}
           {!error && !jobs && <p className="text-2xl text-[#8a8a8a]">Loading jobs…</p>}
-          {jobs?.length === 0 && <p className="text-2xl">No jobs found yet.</p>}
+          {jobs?.length === 0 && (
+            <EmptyJobsState>
+              <p>
+                Try{" "}
+                <Link to="/search" className="font-bold text-black underline underline-offset-4 hover:text-[#E75A8F]">
+                  searching with different filters
+                </Link>{" "}
+                or{" "}
+                <Link to="/profile" className="font-bold text-black underline underline-offset-4 hover:text-[#E75A8F]">
+                  updating your resume
+                </Link>{" "}
+                so we can find better matches.
+              </p>
+            </EmptyJobsState>
+          )}
           {jobs?.map((job) => (
             <JobCard key={job.id} job={job} />
           ))}
