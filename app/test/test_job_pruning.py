@@ -14,10 +14,10 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-from db import Base  # noqa: E402
-from job_listing import JobListing  # noqa: E402
+from jobrec.db import Base  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
 from job_pruning import PruneResult, find_prune_candidates, prune_closed_listings  # noqa: E402
-from job_store import JobListingTable, count_listings, list_listings, upsert_listings  # noqa: E402
+from jobrec.job_store import JobListingTable, count_listings, list_listings, upsert_listings  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
 import prune_jobs  # noqa: E402
 
@@ -41,10 +41,12 @@ def url(job_id: str, host: str = "acme.com") -> str:
 
 
 def make_listing(job_id: str, host: str = "acme.com", company: str = "Acme", **overrides) -> JobListing:
+    # Page-check fixtures are not greenhouse. An unresolved greenhouse source
+    # is unknown and is not fetched, so these controls would stop reaching the page.
     fields = {
         "title": "Software Engineer",
         "company_name": company,
-        "source": "greenhouse",
+        "source": "lever",
         "application_url": url(job_id, host),
         "source_job_id": job_id,
     }
