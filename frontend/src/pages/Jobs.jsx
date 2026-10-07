@@ -4,20 +4,27 @@ import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
 import { ChevronDownIcon, FunnelIcon } from "../components/Icons.jsx";
 import { fetchJobs } from "../api/jobs.js";
+import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 
 export default function Jobs() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [jobs, setJobs] = useState(null);
   const [error, setError] = useState(null);
+  const { accessToken, isLoading } = useAuthenticatedUser();
 
   useEffect(() => {
-    fetchJobs()
+    if (isLoading) return;
+    if (!accessToken) {
+      setError("Sign in to see your job recommendations.");
+      return;
+    }
+    fetchJobs(accessToken)
       .then(setJobs)
       .catch((err) => {
         console.error(err);
         setError("Couldn't load jobs. Is the backend running?");
       });
-  }, []);
+  }, [accessToken, isLoading]);
 
   return (
     <div className="min-h-screen bg-white">

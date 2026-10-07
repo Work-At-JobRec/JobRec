@@ -1,4 +1,5 @@
 import os
+import math
 from os import environ as env
 from urllib.parse import urlparse
 from flask import (
@@ -242,13 +243,40 @@ def allowed_file(filename):
 
 
 @app.route("/api/jobs")
+@require_auth
 def jobs_api():
-    return jsonify(get_jobs())
+    salary_parameter = request.args.get("desired_salary")
+    desired_salary: float | None = None
+    if salary_parameter is not None:
+        try:
+            desired_salary = float(salary_parameter)
+        except ValueError:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+        if not math.isfinite(desired_salary) or desired_salary <= 0:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+    return jsonify(
+        get_jobs(
+            engine,
+            get_user_id(),
+            desired_salary,
+            request.args.get("location"),
+        )
+    )
 
 
 @app.route("/api/jobs/<job_id>")
-def job_detail_api(job_id):
-    job = get_job(job_id)
+@require_auth
+def job_detail_api(job_id: str):
+    salary_parameter = request.args.get("desired_salary")
+    desired_salary: float | None = None
+    if salary_parameter is not None:
+        try:
+            desired_salary = float(salary_parameter)
+        except ValueError:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+        if not math.isfinite(desired_salary) or desired_salary <= 0:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+    job = get_job(job_id, engine, get_user_id(), desired_salary)
     if job is None:
         return jsonify(error="Job not found"), 404
     return jsonify(job)
