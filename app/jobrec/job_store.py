@@ -226,3 +226,35 @@ def list_listings(engine: Engine, limit: Optional[int] = None) -> list[JobListin
 def count_listings(engine: Engine) -> int:
     with Session(engine) as session:
         return session.scalar(select(func.count()).select_from(JobListingTable)) or 0
+
+
+def list_recent_listings(engine: Engine, limit: int, description_chars: Optional[int] = None) -> list[JobListing]:
+    """Return up to ``limit`` stored listings, most recently posted first.
+
+    A listing with no posting date is placed by when it was first seen. Listings without a
+    source job id are left out, since they have no stable id to link to. When
+    ``description_chars`` is given, the description is cut to that length in the database,
+    so a page of listings does not pull every full description over the wire.
+    """
+    table = JobListingTable.__table__
+    description = table.c.description
+    if description_chars is not None:
+        description = func.substr(table.c.description, 1, description_chars).label("description")
+    columns = [column for column in table.c if column.name != "description"] + [description]
+    query = (
+        select(*columns)
+        .where(table.c.source_job_id.is_not(None))
+        # coalesce keeps the order the same on SQLite and Postgres, which sort NULLs differently.
+        .order_by(func.coalesce(table.c.posted_at, table.c.first_seen_at).desc(), table.c.id.desc())
+        .limit(limit)
+    )
+    with Session(engine) as session:
+        return [to_job_listing(row) for row in session.execute(query)]
+
+
+def get_listing(engine: Engine, source: str, source_job_id: str) -> Optional[JobListing]:
+    """Return the stored listing with this source and source job id, or None."""
+    key = _fit_key(f"{source.strip().lower()}:id:{source_job_id.strip()}")
+    with Session(engine) as session:
+        row = session.scalar(select(JobListingTable).where(JobListingTable.dedupe_key == key))
+        return to_job_listing(row) if row is not None else None
