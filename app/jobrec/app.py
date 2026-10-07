@@ -40,8 +40,6 @@ import importlib
 
 from jobrec.job_sources import load_sources, scrape_all
 
-from job_sources import load_sources, scrape_all
-
 load_dotenv()
 
 
