@@ -1,0 +1,21 @@
+{
+  "sources": [
+    {"scraper": "greenhouse", "id": "stripe", "company_name": "Stripe", "enabled": true},
+    {"scraper": "greenhouse", "id": "figma", "company_name": "Figma", "enabled": true},
+    {"scraper": "greenhouse", "id": "cloudflare", "company_name": "Cloudflare", "enabled": true},
+    {"scraper": "greenhouse", "id": "robinhood", "company_name": "Robinhood", "enabled": true},
+    {"scraper": "greenhouse", "id": "airbnb", "company_name": "Airbnb", "enabled": true},
+    {"scraper": "greenhouse", "id": "duolingo", "company_name": "Duolingo", "enabled": true},
+    {"scraper": "greenhouse", "id": "reddit", "company_name": "Reddit", "enabled": true},
+    {"scraper": "greenhouse", "id": "roblox", "company_name": "Roblox", "enabled": true},
+    {"scraper": "greenhouse", "id": "datadog", "company_name": "Datadog", "enabled": true},
+    {"scraper": "lever", "id": "palantir", "company_name": "Palantir", "enabled": true},
+    {"scraper": "lever", "id": "spotify", "company_name": "Spotify", "enabled": true},
+    {"scraper": "lever", "id": "zoox", "company_name": "Zoox", "enabled": true},
+    {"scraper": "workday", "id": "nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "company_name": "NVIDIA", "enabled": true},
+    {"scraper": "workday", "id": "salesforce.wd12.myworkdayjobs.com/External_Career_Site", "company_name": "Salesforce", "enabled": true},
+    {"scraper": "workday", "id": "intel.wd1.myworkdayjobs.com/External", "company_name": "Intel", "enabled": true},
+    {"scraper": "workday", "id": "adobe.wd5.myworkdayjobs.com/external_experienced", "company_name": "Adobe", "enabled": true},
+    {"scraper": "workday", "id": "cat.wd5.myworkdayjobs.com/CaterpillarCareers", "company_name": "Caterpillar", "enabled": true}
+  ]
+}
