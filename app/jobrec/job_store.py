@@ -254,7 +254,7 @@ def list_recent_listings(engine: Engine, limit: int, description_chars: Optional
 
 def get_listing(engine: Engine, source: str, source_job_id: str) -> Optional[JobListing]:
     """Return the stored listing with this source and source job id, or None."""
-    key = _fit_key(f"{source.strip().lower()}:id:{source_job_id.strip()}")
+    key = f"{source.strip().lower()}:id:{source_job_id.strip()}"
     with Session(engine) as session:
         row = session.scalar(select(JobListingTable).where(JobListingTable.dedupe_key == key))
         return to_job_listing(row) if row is not None else None

@@ -26,9 +26,9 @@ import requests
 from sqlalchemy import Engine, and_, delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from db import Base
-from job_store import JobListingTable, _to_db
-from link_check import LinkStatus, check_link
+from jobrec.db import Base
+from jobrec.job_store import JobListingTable, _to_db
+from jobrec.link_check import LinkStatus, check_link
 
 logger = logging.getLogger(__name__)
 

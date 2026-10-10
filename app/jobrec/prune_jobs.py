@@ -1,6 +1,6 @@
 """Remove stored job listings that are no longer open.
 
-Run from app/src:  python prune_jobs.py [--delete] [--limit N]
+Run from app:  poetry run python -m jobrec.prune_jobs [--delete] [--limit N]
 
 Without --delete this is a dry run: it follows the links of the candidate
 listings and reports how many look closed, but removes nothing. Uses the same
@@ -15,8 +15,10 @@ from os import environ as env
 
 from dotenv import load_dotenv
 
-from db import Base, make_engine
-from job_pruning import prune_closed_listings
+from sqlalchemy import create_engine
+
+from jobrec.db import Base
+from jobrec.job_pruning import prune_closed_listings
 
 
 def main(argv=None, *, engine=None, session=None, now=None, sleep=time.sleep) -> int:
@@ -28,7 +30,7 @@ def main(argv=None, *, engine=None, session=None, now=None, sleep=time.sleep) ->
     if engine is None:
         load_dotenv()
         logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-        engine = make_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
+        engine = create_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
         Base.metadata.create_all(engine)
 
     result = prune_closed_listings(engine, session, dry_run=not args.delete, limit=args.limit, now=now, sleep=sleep)
