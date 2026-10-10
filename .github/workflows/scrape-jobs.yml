@@ -1,0 +1,71 @@
+# Scrapes the registered job sources into the application database.
+# Run it by hand from the Actions tab, or let the daily schedule do it.
+# Needs the repository secret DATABASE_URL (the same value the deployment uses).
+
+name: Scrape jobs
+
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: Registry file in app/jobrec to scrape
+        default: job_sources_demo.json
+      detect_skills:
+        description: Expose OPENAI_API_KEY to the run (LLM calls per listing cost money)
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 9 * * *"
+
+permissions:
+  contents: read
+
+# Two scrapes writing the same listings at once would collide; let a running one finish.
+concurrency:
+  group: scrape-jobs
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: app
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SOURCES: ${{ inputs.sources || 'job_sources_demo.json' }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Require DATABASE_URL
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Secret DATABASE_URL is not set; refusing to scrape into a throwaway SQLite file."
+            exit 1
+          fi
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip poetry
+          poetry install
+      - name: Scrape
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DETECT_SKILLS: ${{ inputs.detect_skills }}
+        run: |
+          set -o pipefail
+          # Without the key, any per-listing LLM step fails fast and the listings are still stored.
+          if [ "$DETECT_SKILLS" != "true" ]; then unset OPENAI_API_KEY; fi
+          poetry run python -m jobrec.scrape_all --sources "jobrec/$SOURCES" | tee "$RUNNER_TEMP/scrape.txt"
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Scrape results ($SOURCES)"
+            echo '```'
+            cat "$RUNNER_TEMP/scrape.txt" 2>/dev/null || echo "no output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
