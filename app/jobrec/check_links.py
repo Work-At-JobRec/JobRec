@@ -1,6 +1,6 @@
 """Measure how many stored application links are valid (validation test NF-05, requirement NFR-006).
 
-Run from app/src:  python check_links.py [--sample 100]
+Run from app:  poetry run python -m jobrec.check_links [--sample 100]
 
 Samples stored listings, follows each application link, and reports the share
 that resolve to a live page and the share whose page mentions the stored job
@@ -22,9 +22,11 @@ from dotenv import load_dotenv
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from db import Base, make_engine
-from job_store import JobListingTable
-from link_check import LinkStatus, check_link
+from sqlalchemy import create_engine
+
+from jobrec.db import Base
+from jobrec.job_store import JobListingTable
+from jobrec.link_check import LinkStatus, check_link
 
 DEFAULT_SAMPLE_SIZE = 100
 DEFAULT_PAUSE = 0.5
@@ -93,7 +95,7 @@ def main(argv=None) -> int:
 
     load_dotenv()
     logging.basicConfig(level=logging.WARNING)
-    engine = make_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
+    engine = create_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
     Base.metadata.create_all(engine)
 
     report = check_stored_links(engine, sample_size=args.sample)
