@@ -103,6 +103,11 @@ def _fit_key(key: str) -> str:
     return key[:max_length - len(digest) - 1] + "#" + digest
 
 
+def id_key(source: str, job_id: str) -> str:
+    """The key a listing is stored under when its source reports a job id."""
+    return _fit_key(f"{source.strip().lower()}:id:{job_id.strip()}")
+
+
 def listing_key(listing: JobListing) -> str:
     """Return the string that identifies a listing across scraper runs.
 
@@ -114,7 +119,7 @@ def listing_key(listing: JobListing) -> str:
     source = listing.source.strip().lower()
     job_id = (listing.source_job_id or "").strip()
     if job_id:
-        return _fit_key(f"{source}:id:{job_id}")
+        return id_key(source, job_id)
     url = normalize_url(listing.application_url)
     if url:
         return _fit_key(f"{source}:url:{url}")
@@ -289,7 +294,7 @@ def list_recent_listings(engine: Engine, limit: int, description_chars: Optional
 
 def get_listing(engine: Engine, source: str, source_job_id: str) -> Optional[JobListing]:
     """Return the stored listing with this source and source job id, or None."""
-    key = _fit_key(f"{source.strip().lower()}:id:{source_job_id.strip()}")
+    key = id_key(source, source_job_id)
     with Session(engine) as session:
         row = session.scalar(select(JobListingTable).where(JobListingTable.dedupe_key == key))
         return to_job_listing(row) if row is not None else None
