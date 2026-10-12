@@ -16,7 +16,10 @@ function LeftPanel({ processing, userInfo, onUpload }) {
   const contact = userInfo ?? PLACEHOLDER_CONTACT;
 
   return (
-    <section className="border-r border-[#bdbdbd] text-center flex flex-col justify-center p-[34px_34px_40px] md:border-r md:border-b-0 border-b">
+    <section className="border-r border-[#bdbdbd] text-center p-[34px_34px_40px] md:border-r md:border-b-0 border-b">
+      {/* Center within one viewport height (minus navbar and padding) rather than the whole
+          section, so the panel doesn't drift down when the right panel grows after parsing */}
+      <div className="flex flex-col justify-center md:min-h-[calc(100vh-58px-74px)]">
       <h1 className="m-0 mb-6 text-[30px] font-bold">Your Profile</h1>
       {contact.name && <p className="m-0 text-2xl font-bold">{contact.name}</p>}
       {contact.email && <p className="m-0 mt-1 text-2xl font-bold">{contact.email}</p>}
@@ -54,6 +57,7 @@ function LeftPanel({ processing, userInfo, onUpload }) {
           </form>
         </>
       )}
+      </div>
     </section>
   );
 }
