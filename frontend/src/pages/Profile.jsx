@@ -62,7 +62,7 @@ function LeftPanel({ processing, userInfo, onUpload }) {
   );
 }
 
-function RightPanel({ userInfo }) {
+function RightPanel({ userInfo, onRemoveSkill }) {
   if (userInfo) {
     return (
       <section className="relative flex flex-col justify-center p-[34px_34px_40px]">
@@ -94,13 +94,25 @@ function RightPanel({ userInfo }) {
           </ul>
 
           <MenuItem label="Skills:" />
-          <ul>
-            {userInfo.skills.map((skill, i) => (
-              <li key={i}>
-                {skill.skill_name}: {skill.proficiency_level}/4
-              </li>
+          {/* Proficiency levels stay in the database for recommendations but aren't shown */}
+          <div className="flex flex-wrap gap-2">
+            {userInfo.skills.map((skill) => (
+              <span
+                key={skill.skill_name}
+                className="inline-flex items-center gap-1.5 border-2 border-[#E75A8F] rounded-full py-1 pl-3 pr-2 text-base"
+              >
+                {skill.skill_name}
+                <button
+                  type="button"
+                  onClick={() => onRemoveSkill(skill.skill_name)}
+                  aria-label={`Remove ${skill.skill_name}`}
+                  className="w-5 h-5 inline-flex items-center justify-center rounded-full text-[#E75A8F] hover:bg-[#E75A8F] hover:text-white transition-colors leading-none"
+                >
+                  ×
+                </button>
+              </span>
             ))}
-          </ul>
+          </div>
 
           <MenuItem label="Socials:" />
           <ul>
@@ -199,6 +211,28 @@ export default function Profile() {
     fetchProfile();
   };
 
+  const handleRemoveSkill = async (skillName) => {
+    // Remove immediately so the chip disappears on click; resync if the server rejects it
+    setUserInfo((prev) => ({
+      ...prev,
+      skills: prev.skills.filter((s) => s.skill_name !== skillName),
+    }));
+    try {
+      const res = await fetch("/api/profile/skills", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ skill_name: skillName }),
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+    } catch (err) {
+      console.error("Failed to remove skill", err);
+      fetchProfile();
+    }
+  };
+
   const processing = status === "processing";
 
   return (
@@ -207,7 +241,7 @@ export default function Profile() {
         <Navbar />
         <main className="grid md:grid-cols-[42%_58%] grid-cols-1 min-h-[calc(100vh-58px)] items-stretch">
           <LeftPanel processing={processing} userInfo={userInfo} onUpload={handleUpload} />
-          {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} />}
+          {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} onRemoveSkill={handleRemoveSkill} />}
         </main>
       </div>
     </div>
