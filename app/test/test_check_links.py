@@ -10,9 +10,9 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-from check_links import check_stored_links  # noqa: E402
-from job_listing import JobListing  # noqa: E402
-from job_store import upsert_listings  # noqa: E402
+from jobrec.check_links import check_stored_links  # noqa: E402
+from jobrec.job_listing import JobListing  # noqa: E402
+from jobrec.job_store import upsert_listings  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
 
 
