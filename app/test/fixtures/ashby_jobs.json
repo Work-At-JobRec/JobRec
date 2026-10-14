@@ -1,0 +1,54 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "34413f8d-26bf-4bbc-8ade-eb309a0e2245",
+      "title": " Security Engineer, Cloud",
+      "department": "Engineering",
+      "team": "Backend",
+      "employmentType": "FullTime",
+      "location": "New York, NY (HQ)",
+      "secondaryLocations": [
+        {"location": "Remote (US)", "address": {"postalAddress": {"addressCountry": "United States"}}}
+      ],
+      "publishedAt": "2026-04-07T17:12:35.753+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Hybrid",
+      "jobUrl": "https://jobs.ashbyhq.com/acme/34413f8d-26bf-4bbc-8ade-eb309a0e2245",
+      "applyUrl": "https://jobs.ashbyhq.com/acme/34413f8d-26bf-4bbc-8ade-eb309a0e2245/application",
+      "descriptionHtml": "<h1><strong>About Acme</strong></h1><p>Acme builds finance infrastructure.</p><ul><li>Secure our cloud.</li></ul>",
+      "descriptionPlain": "ABOUT ACME\n\nAcme builds finance infrastructure.\n\n- Secure our cloud.",
+      "compensation": {
+        "compensationTierSummary": "$211.4K – $290.6K • Offers Equity",
+        "scrapeableCompensationSalarySummary": "$211.4K - $290.6K",
+        "summaryComponents": [
+          {"compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": null, "maxValue": null},
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 211400, "maxValue": 290600}
+        ]
+      }
+    },
+    {
+      "id": "0b1c2d3e-0000-4000-8000-000000000002",
+      "title": "Software Engineering Intern",
+      "employmentType": "Intern",
+      "isListed": true,
+      "jobUrl": "https://jobs.ashbyhq.com/acme/0b1c2d3e-0000-4000-8000-000000000002",
+      "applyUrl": "https://jobs.ashbyhq.com/acme/0b1c2d3e-0000-4000-8000-000000000002/application"
+    },
+    {
+      "id": "0b1c2d3e-0000-4000-8000-000000000003",
+      "title": "Product Designer",
+      "location": "Remote",
+      "publishedAt": "2026-08-01T09:00:00.000+00:00",
+      "isListed": false,
+      "jobUrl": "https://jobs.ashbyhq.com/acme/0b1c2d3e-0000-4000-8000-000000000003",
+      "descriptionHtml": "<p>Design delightful products.</p>",
+      "compensation": {
+        "compensationTierSummary": "$60 – $75 per hour",
+        "scrapeableCompensationSalarySummary": "$60 - $75 per hour",
+        "summaryComponents": []
+      }
+    }
+  ]
+}
