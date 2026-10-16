@@ -221,6 +221,15 @@ def test_get_listing_by_source_and_id(engine):
     assert get_listing(engine, "lever", "2") is None
 
 
+# A source job id too long for the key column is shortened the same way when stored and when looked up
+def test_get_listing_with_very_long_source_job_id(engine):
+    long_id = "x" * 2000
+    upsert_listings(engine, [make_listing(source_job_id=long_id, title="Long")])
+
+    assert get_listing(engine, "greenhouse", long_id).title == "Long"
+    assert get_listing(engine, "greenhouse", long_id[:-1] + "y") is None
+
+
 # The recent-listings query cuts the description in the database, not after loading it
 def test_list_recent_listings_can_cut_the_description(engine):
     upsert_listings(engine, [make_listing(description="x" * 1000)])

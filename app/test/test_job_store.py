@@ -2,8 +2,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 # Lets this test import app/src/job_store.py
@@ -26,14 +25,6 @@ T2 = datetime(2026, 9, 28, 10, 0, tzinfo=timezone.utc)
 T3 = datetime(2026, 9, 29, 10, 0, tzinfo=timezone.utc)
 
 
-@pytest.fixture
-def engine(tmp_path):
-    """A fresh SQLite database with every table created, matching how the app creates its schema."""
-    test_engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'jobs.db'}")
-    Base.metadata.create_all(test_engine)
-    return test_engine
-
-
 def make_listing(**overrides) -> JobListing:
     fields = {
         "title": "Software Engineer",
@@ -51,6 +42,11 @@ def make_listing(**overrides) -> JobListing:
     }
     fields.update(overrides)
     return JobListing(**fields)
+
+
+def as_utc(value: datetime) -> datetime:
+    """Stored timestamps as timezone-aware UTC: SQLite returns them naive, Postgres aware."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 def rows(engine) -> list[JobListingTable]:
@@ -263,19 +259,19 @@ def test_first_seen_preserved_and_last_seen_refreshed_on_resight(engine):
 
     row = rows(engine)[0]
 
-    assert row.first_seen_at.replace(tzinfo=timezone.utc) == T1
-    assert row.last_seen_at.replace(tzinfo=timezone.utc) == T2
+    assert as_utc(row.first_seen_at) == T1
+    assert as_utc(row.last_seen_at) == T2
 
 
 # The updated time only moves when a field actually changes
 def test_updated_at_changes_only_when_a_field_changes(engine):
     upsert_listings(engine, [make_listing()], now=T1)
     upsert_listings(engine, [make_listing()], now=T2)
-    assert rows(engine)[0].updated_at.replace(tzinfo=timezone.utc) == T1
+    assert as_utc(rows(engine)[0].updated_at) == T1
 
     upsert_listings(engine, [make_listing(description="Changed")], now=T3)
 
-    assert rows(engine)[0].updated_at.replace(tzinfo=timezone.utc) == T3
+    assert as_utc(rows(engine)[0].updated_at) == T3
 
 
 # --- read helpers ---
@@ -299,3 +295,97 @@ def test_count_listings_counts_rows(engine):
     upsert_listings(engine, [make_listing(source_job_id=str(i)) for i in range(3)])
 
     assert count_listings(engine) == 3
+
+
+# --- values that Postgres would reject (#97) ---
+
+# A pay line longer than its column is shortened instead of failing the whole batch
+def test_long_pay_is_clipped_to_column_length(engine):
+    long_pay = "; ".join(f"USD {n},000-{n + 20},000 (Range {n})" for n in range(100, 130))
+    assert len(long_pay) > 255
+
+    result = upsert_listings(engine, [make_listing(pay=long_pay)])
+
+    assert result.inserted == 1
+    stored = rows(engine)[0].pay
+    assert len(stored) == 255
+    assert long_pay.startswith(stored[:200])
+
+
+# Every length-limited text column is clipped the same way
+def test_long_title_company_and_location_are_clipped(engine):
+    upsert_listings(engine, [make_listing(title="T" * 600, company_name="C" * 300, location="L" * 300)])
+
+    row = rows(engine)[0]
+
+    assert len(row.title) == 512
+    assert len(row.company_name) == 255
+    assert len(row.location) == 255
+
+
+# A clipped listing seen again is recognised as unchanged, not rewritten every run
+def test_clipped_listing_rerun_is_unchanged(engine):
+    listing = make_listing(pay="P" * 400, title="T" * 600)
+    upsert_listings(engine, [listing])
+
+    result = upsert_listings(engine, [listing])
+
+    assert result == UpsertResult(inserted=0, updated=0, unchanged=1)
+
+
+# NUL bytes, which Postgres refuses to store in text, are removed
+def test_nul_bytes_are_removed_from_text(engine):
+    upsert_listings(engine, [make_listing(description="Build\x00 things.", title="Engi\x00neer")])
+
+    row = rows(engine)[0]
+
+    assert row.description == "Build things."
+    assert row.title == "Engineer"
+
+
+# A key built from a very long URL is shortened so it always fits the unique key column
+def test_listing_key_for_very_long_url_fits_the_key_column():
+    long_url = "https://acme.com/jobs/" + "a" * 3000
+    other_url = "https://acme.com/jobs/" + "a" * 2999 + "b"
+
+    key = listing_key(make_listing(source_job_id=None, application_url=long_url))
+    other_key = listing_key(make_listing(source_job_id=None, application_url=other_url))
+
+    assert len(key) <= 1024
+    assert key.startswith("greenhouse:url:https://acme.com/jobs/")
+    assert key == listing_key(make_listing(source_job_id=None, application_url=long_url))
+    assert key != other_key
+
+
+# Two listings with very long URLs still store and deduplicate correctly
+def test_very_long_urls_store_and_deduplicate(engine):
+    long_url = "https://acme.com/jobs/" + "a" * 3000
+
+    upsert_listings(engine, [make_listing(source_job_id=None, application_url=long_url)])
+    result = upsert_listings(engine, [make_listing(source_job_id=None, application_url=long_url)])
+
+    assert result.existing == 1
+    assert count_listings(engine) == 1
+    assert len(rows(engine)[0].application_url) == 2048
+
+
+# If another run stored the same new listing first, the batch is retried instead of lost
+def test_upsert_retries_once_when_another_run_inserts_the_same_key(engine, monkeypatch):
+    import jobrec.job_store as job_store
+    from sqlalchemy.exc import IntegrityError
+
+    real = job_store._upsert_once
+    calls = []
+
+    def flaky(engine_, by_key, now):
+        calls.append(1)
+        if len(calls) == 1:
+            raise IntegrityError("insert", {}, Exception("duplicate key"))
+        return real(engine_, by_key, now)
+
+    monkeypatch.setattr(job_store, "_upsert_once", flaky)
+
+    result = upsert_listings(engine, [make_listing()])
+
+    assert len(calls) == 2
+    assert result.inserted == 1
