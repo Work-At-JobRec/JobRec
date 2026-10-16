@@ -1,5 +1,7 @@
 """Stand-ins for requests responses and sessions, shared by the link-check and pruning tests."""
 
+import json
+
 
 class FakeResponse:
     """A page as requests would return it: status, body, and the URL the request ended on."""
@@ -15,6 +17,9 @@ class FakeResponse:
     def iter_content(self, chunk_size=8192):
         for start in range(0, len(self._body), chunk_size):
             yield self._body[start:start + chunk_size]
+
+    def json(self):
+        return json.loads(self._body.decode(self.encoding))
 
     def close(self):
         self.closed = True

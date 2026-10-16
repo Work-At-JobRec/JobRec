@@ -16,7 +16,8 @@ sys.path.insert(0, SRC_DIR)
 
 from jobrec.db import Base  # noqa: E402
 from jobrec.job_listing import JobListing  # noqa: E402
-from jobrec.job_pruning import PruneResult, find_prune_candidates, prune_closed_listings  # noqa: E402
+from jobrec.job_pruning import PruneResult, find_prune_candidates, greenhouse_boards, prune_closed_listings  # noqa: E402
+from jobrec.link_check import GREENHOUSE_JOB_URL  # noqa: E402
 from jobrec.job_store import JobListingTable, count_listings, list_listings, upsert_listings  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
 from jobrec import prune_jobs  # noqa: E402
@@ -265,3 +266,83 @@ def test_cli_delete_flag_removes_closed_listings(engine, capsys):
     assert code == 0
     assert count_listings(engine) == 5
     assert "removed 4" in capsys.readouterr().out.lower()
+
+
+# --- #103: Greenhouse-hosted careers pages that never answer (Roblox) are checked through the board API ---
+
+ROBLOX_PAGE = "https://careers.roblox.com/jobs/7100?gh_jid=7100"
+ROBLOX_API = GREENHOUSE_JOB_URL.format(board_token="roblox", job_id="7100")
+BOARDS = {"roblox": "roblox"}
+
+
+def roblox_listing():
+    return make_listing("7100", company="Roblox", application_url=ROBLOX_PAGE)
+
+
+def seed_roblox(engine):
+    upsert_listings(engine, [roblox_listing()], now=T1)
+    upsert_listings(engine, [make_listing("fresh", company="Roblox", application_url="https://careers.roblox.com/jobs/1?gh_jid=1")], now=T2)
+
+
+# The page times out, the API says the job exists: the listing is kept and the page is never requested
+def test_greenhouse_listing_is_confirmed_through_the_api_when_its_page_times_out(engine):
+    seed_roblox(engine)
+    session = FakeSession({ROBLOX_PAGE: requests.Timeout("Read timed out"), ROBLOX_API: page(200, '{"id": 7100, "title": "Software Engineer"}')})
+
+    result = prune_closed_listings(engine, session, dry_run=False, now=T2, sleep=no_sleep, board_tokens=BOARDS)
+
+    assert result == PruneResult(checked=1, closed=0, removed=0, kept=1, unknown=0)
+    assert session.calls == [ROBLOX_API]
+
+
+# The API says the job is gone: the listing is removed without touching the page
+def test_greenhouse_listing_is_removed_when_the_api_reports_it_gone(engine):
+    seed_roblox(engine)
+    session = FakeSession({ROBLOX_PAGE: requests.Timeout("Read timed out"), ROBLOX_API: page(404, '{"status": 404, "error": "Job not found"}')})
+
+    result = prune_closed_listings(engine, session, dry_run=False, now=T2, sleep=no_sleep, board_tokens=BOARDS)
+
+    assert result == PruneResult(checked=1, closed=1, removed=1, kept=0, unknown=0)
+    assert stored_ids(engine) == ["fresh"]
+
+
+# When the API cannot say either, the page is tried and the listing is kept as undetermined
+def test_greenhouse_api_failure_falls_back_to_the_page(engine):
+    seed_roblox(engine)
+    session = FakeSession({ROBLOX_PAGE: requests.Timeout("Read timed out"), ROBLOX_API: requests.Timeout("timed out")})
+
+    result = prune_closed_listings(engine, session, dry_run=False, now=T2, sleep=no_sleep, board_tokens=BOARDS)
+
+    assert result == PruneResult(checked=1, closed=0, removed=0, kept=0, unknown=1)
+    assert session.calls == [ROBLOX_API, ROBLOX_PAGE]
+
+
+# A listing from another source, even at a company with a known board, is checked on its page as before
+def test_listings_from_other_sources_are_checked_on_their_page(engine):
+    upsert_listings(engine, [make_listing("l1", source="lever", company="Roblox", application_url="https://jobs.lever.co/roblox/l1")], now=T1)
+    upsert_listings(engine, [make_listing("l2", source="lever", company="Roblox", application_url="https://jobs.lever.co/roblox/l2")], now=T2)
+    session = FakeSession({"https://jobs.lever.co/roblox/l1": page(404, "Not found")})
+
+    result = prune_closed_listings(engine, session, dry_run=False, now=T2, sleep=no_sleep, board_tokens=BOARDS)
+
+    assert result.removed == 1
+    assert session.calls == ["https://jobs.lever.co/roblox/l1"]
+
+
+# Board tokens come from the source registries: Greenhouse entries keyed by company name (or token when there is no name)
+def test_greenhouse_boards_are_read_from_the_registries(tmp_path):
+    registry = tmp_path / "sources.json"
+    registry.write_text(
+        '{"sources": [{"scraper": "greenhouse", "id": "roblox", "company_name": "Roblox"}, '
+        '{"scraper": "greenhouse", "id": "figma"}, {"scraper": "lever", "id": "palantir", "company_name": "Palantir"}]}',
+        encoding="utf-8",
+    )
+
+    boards = greenhouse_boards([registry, tmp_path / "missing.json"])
+
+    assert boards == {"roblox": "roblox", "figma": "figma"}
+
+
+# By default the checked-in registries are read, and they know Roblox
+def test_default_greenhouse_boards_include_the_checked_in_registry():
+    assert greenhouse_boards()["roblox"] == "roblox"
