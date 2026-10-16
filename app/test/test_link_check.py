@@ -10,7 +10,7 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-from link_check import LinkStatus, check_link  # noqa: E402
+from jobrec.link_check import LinkStatus, check_link  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
 
 URL = "https://acme.com/jobs/123"

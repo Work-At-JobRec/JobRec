@@ -16,6 +16,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Engine
 
+from jobrec.ashby_scraper import AshbyScraper
 from jobrec.greenhouse_scraper import GreenhouseScraper
 from jobrec.job_store import UpsertResult
 from jobrec.lever_scraper import LeverScraper
@@ -29,6 +30,7 @@ DEFAULT_SOURCES_PATH = Path(__file__).with_name("job_sources.json")
 
 # Scraper name as written in the registry -> class. Every class takes (id, company_name=...).
 SCRAPER_TYPES: dict[str, type] = {
+    "ashby": AshbyScraper,
     "greenhouse": GreenhouseScraper,
     "lever": LeverScraper,
     "workday": WorkdayScraper,
