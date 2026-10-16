@@ -154,9 +154,9 @@ def test_valid_pdf_upload_is_saved(tmp_path):
                 headers=fake_headers,
             )
 
-    uploaded_file = tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+    saved = list(tmp_path.iterdir())
 
-    assert uploaded_file.exists()
+    assert len(saved) == 1 and saved[0].suffix == ".pdf"
     assert response.status_code == 200
 
 
@@ -190,9 +190,9 @@ def test_valid_docx_upload_is_saved(tmp_path):
                 headers=fake_headers,
             )
 
-    uploaded_file = tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
+    saved = list(tmp_path.iterdir())
 
-    assert uploaded_file.exists()
+    assert len(saved) == 1 and saved[0].suffix == ".docx"
     assert response.status_code == 200
 
 
@@ -368,3 +368,87 @@ def test_api_returns_correct_personals(tmp_path):
         assert data.email == dummy_user_personal.email
         assert data.name == dummy_user_personal.name
         assert data.phone == dummy_user_personal.phone
+
+
+# --- #116: uploads are stored under a per-user random name, never the name the browser sent ---
+
+RESUME_PDF = os.path.join(
+    os.path.dirname(__file__), "test_resumes", "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+)
+
+
+def post_resume(client, browser_name="resume.pdf"):
+    with open(RESUME_PDF, "rb") as resume_file, patch("jobrec.app.Thread") as thread:
+        response = client.post(
+            "/upload",
+            data={"resume": (resume_file, browser_name)},
+            content_type="multipart/form-data",
+            headers=fake_headers,
+        )
+    return response, thread
+
+
+# The stored name is derived from the user and a random token, with the extension the browser sent
+def test_upload_filename_is_per_user_random_and_keeps_the_extension():
+    from jobrec.app import upload_filename
+
+    first = upload_filename("auth0|alice", "My Resume (final).PDF")
+    second = upload_filename("auth0|alice", "My Resume (final).PDF")
+    other = upload_filename("auth0|bob", "My Resume (final).PDF")
+
+    assert first.endswith(".pdf") and second.endswith(".pdf")
+    assert first != second
+    assert first.split("-")[0] == second.split("-")[0]
+    assert first.split("-")[0] != other.split("-")[0]
+    assert "My" not in first and "(" not in first and "/" not in first and "\\" not in first
+
+
+# The file on disk does not carry the browser's filename, and the parse thread gets the stored path
+@ignore_auth
+def test_upload_is_stored_under_a_random_name_not_the_browsers(tmp_path):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    client = app.test_client()
+
+    response, thread = post_resume(client, "Jane_Smith_Resume.pdf")
+
+    assert response.status_code == 200
+    saved = list(tmp_path.iterdir())
+    assert len(saved) == 1
+    assert saved[0].name != "Jane_Smith_Resume.pdf"
+    assert saved[0].suffix == ".pdf"
+    assert thread.call_args.kwargs["args"][2] == str(saved[0])
+
+
+# Two users who both upload "resume.pdf" get two files; neither overwrites the other
+def test_two_users_uploading_the_same_filename_get_separate_files(tmp_path):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    client = app.test_client()
+
+    with patch("jobrec.auth.api_client.verify_access_token", new=mock_verify_access_token):
+        with patch("jobrec.app.get_user_id", return_value="auth0|alice"):
+            first, _ = post_resume(client, "resume.pdf")
+        with patch("jobrec.app.get_user_id", return_value="auth0|bob"):
+            second, _ = post_resume(client, "resume.pdf")
+
+    assert first.status_code == 200 and second.status_code == 200
+    saved = sorted(p.name for p in tmp_path.iterdir())
+    assert len(saved) == 2
+    assert "resume.pdf" not in saved
+    assert saved[0].split("-")[0] != saved[1].split("-")[0]
+
+
+# --- #117: the upload route does not print the request to the function log ---
+
+@ignore_auth
+def test_upload_does_not_print_the_request(tmp_path, capsys):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    client = app.test_client()
+
+    post_resume(client, "Jane_Smith_Resume.pdf")
+
+    captured = capsys.readouterr()
+    assert "Jane_Smith_Resume.pdf" not in captured.out
+    assert "ImmutableMultiDict" not in captured.out
