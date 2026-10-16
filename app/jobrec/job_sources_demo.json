@@ -16,6 +16,11 @@
     {"scraper": "workday", "id": "salesforce.wd12.myworkdayjobs.com/External_Career_Site", "company_name": "Salesforce", "enabled": true},
     {"scraper": "workday", "id": "intel.wd1.myworkdayjobs.com/External", "company_name": "Intel", "enabled": true},
     {"scraper": "workday", "id": "adobe.wd5.myworkdayjobs.com/external_experienced", "company_name": "Adobe", "enabled": true},
-    {"scraper": "workday", "id": "cat.wd5.myworkdayjobs.com/CaterpillarCareers", "company_name": "Caterpillar", "enabled": true}
+    {"scraper": "workday", "id": "cat.wd5.myworkdayjobs.com/CaterpillarCareers", "company_name": "Caterpillar", "enabled": true},
+    {"scraper": "ashby", "id": "ramp", "company_name": "Ramp", "enabled": true},
+    {"scraper": "ashby", "id": "notion", "company_name": "Notion", "enabled": true},
+    {"scraper": "ashby", "id": "cursor", "company_name": "Cursor", "enabled": true},
+    {"scraper": "ashby", "id": "perplexity", "company_name": "Perplexity", "enabled": true},
+    {"scraper": "ashby", "id": "replit", "company_name": "Replit", "enabled": true}
   ]
 }

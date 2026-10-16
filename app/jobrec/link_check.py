@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 
 import requests
 
-from job_normalization import clean_text
+from jobrec.job_normalization import clean_text
 
 logger = logging.getLogger(__name__)
 
