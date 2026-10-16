@@ -1,6 +1,4 @@
-import hashlib
 import os
-import uuid
 from os import environ as env
 from urllib.parse import urlparse
 from flask import (
@@ -26,6 +24,8 @@ from jobrec.job_store import (
     JobListingTable,
 )
 from threading import Thread
+import hashlib
+import uuid
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
