@@ -164,20 +164,36 @@ export default function Profile() {
   const [userInfo, setUserInfo] = useState(null);
   const [userPersonal, setUserpersonal] = useState(null);
   const pollTimer = useRef(null);
-  const { isAuthenticated, isLoading,  accessToken} = useAuthenticatedUser();
+  const {
+    isAuthenticated,
+    isLoading,
+    getAccessTokenSilently,
+    error: authError,
+  } = useAuthenticatedUser();
 
   const fetchProfile = useCallback(async () => {
-    try { 
-      const res = await fetch("/api/profile", {headers: {
-          Authorization: `Bearer ${accessToken}`
-        }});
-      const data = await res.json();
-      setStatus(data.status);
-      setUserInfo(data.user_info ?? null);
-    } catch (err) {
-      console.error("Failed to fetch profile status", err);
+  try {
+    const token = await getAccessTokenSilently();
+
+    const res = await fetch("/api/profile", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Profile request failed: ${res.status}`);
     }
-  }, [accessToken]);
+
+    const data = await res.json();
+    setStatus(data.status);
+    setUserInfo(data.user_info ?? null);
+
+  } catch (err) {
+    console.error("Failed to fetch profile:", err);
+    setStatus("error");
+  }
+}, [getAccessTokenSilently]);
 
   useEffect(() => {
   if (status === "empty") {
@@ -186,20 +202,21 @@ export default function Profile() {
 }, [status, navigate]);
 
   useEffect(() => {
-    if(accessToken){
-      fetchProfile();
-    }
-  }, [accessToken]);
+  if (isAuthenticated && !isLoading) {
+    fetchProfile();
+  }
+}, [isAuthenticated, isLoading, fetchProfile]);
 
   useEffect(() => {
     if (status !== "processing") return;
     pollTimer.current = setInterval(fetchProfile, 2000);
     return () => clearInterval(pollTimer.current);
-  }, [status, fetchProfile, accessToken]);
+  }, [status, fetchProfile]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
     const fileInput = e.target.elements.resume;
+    const token = await getAccessTokenSilently();
     if (!fileInput.files.length) return;
 
     const formData = new FormData();
@@ -207,7 +224,7 @@ export default function Profile() {
 
     setStatus("processing");
     await fetch("/upload", { method: "POST", body: formData, headers: {
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${token}`
         }});
     fetchProfile();
   };
@@ -219,11 +236,12 @@ export default function Profile() {
       skills: prev.skills.filter((s) => s.skill_name !== skillName),
     }));
     try {
+      const token = await getAccessTokenSilently();
       const res = await fetch("/api/profile/skills", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ skill_name: skillName }),
       });

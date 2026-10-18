@@ -1,17 +1,19 @@
-const { getAccessTokenSilently } = useAuth0();
+import { useAuth0 } from "@auth0/auth0-react";
 
-async function loadProfile() {
-  const token = await getAccessTokenSilently();
+export function useAuthenticatedUser() {
+  const {
+    user,
+    isAuthenticated,
+    isLoading,
+    getAccessTokenSilently,
+    error,
+  } = useAuth0();
 
-  const res = await fetch("/api/profile", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Profile request failed: ${res.status}`);
-  }
-
-  return await res.json();
+  return {
+    user,
+    isAuthenticated,
+    isLoading,
+    getAccessTokenSilently,
+    error,
+  };
 }
