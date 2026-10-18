@@ -6,6 +6,7 @@ from typing import Iterable
 
 from sqlalchemy import Engine
 
+from app.jobrec.job_listing import JobListing
 from jobrec.job_normalization import normalize_listings
 from jobrec.job_store import UpsertResult, listing_key, upsert_listings
 from jobrec.job_validation import filter_valid_listings
