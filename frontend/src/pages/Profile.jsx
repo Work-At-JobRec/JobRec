@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar.jsx";
 import Avatar from "../components/Avatar.jsx";
 import MenuItem from "../components/MenuItem.jsx";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
-
+import { useNavigate } from "react-router-dom";
 
 const PLACEHOLDER_CONTACT = {
   name: "Jane Smith",
@@ -159,6 +159,7 @@ function ProcessingRightPanel() {
 }
 
 export default function Profile() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState("loading");
   const [userInfo, setUserInfo] = useState(null);
   const [userPersonal, setUserpersonal] = useState(null);
@@ -179,10 +180,10 @@ export default function Profile() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (status === "empty") {
-      window.location.href = "/onboarding"
-    }
-  }, [fetchProfile, status])
+  if (status === "empty") {
+    navigate("/onboarding", { replace: true });
+  }
+}, [status, navigate]);
 
   useEffect(() => {
     if(accessToken){

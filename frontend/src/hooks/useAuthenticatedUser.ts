@@ -1,22 +1,17 @@
-import { useAuth0 } from '@auth0/auth0-react';
-import { useEffect, useState } from 'react';
+const { getAccessTokenSilently } = useAuth0();
 
-export function useAuthenticatedUser() {
-  const { user, isAuthenticated, isLoading, getAccessTokenSilently } = useAuth0();
-  const [accessToken, setAccessToken] = useState(null);
+async function loadProfile() {
+  const token = await getAccessTokenSilently();
 
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      getAccessTokenSilently()
-        .then(token => setAccessToken(token))
-        .catch(console.error);
-    }
-  }, [isAuthenticated, isLoading, getAccessTokenSilently]);
+  const res = await fetch("/api/profile", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-  return {
-    user,
-    accessToken,
-    isAuthenticated,
-    isLoading
-  };
+  if (!res.ok) {
+    throw new Error(`Profile request failed: ${res.status}`);
+  }
+
+  return await res.json();
 }
