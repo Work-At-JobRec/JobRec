@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import EmptyJobsState from "../components/EmptyJobsState.jsx";
@@ -12,21 +12,25 @@ export default function Jobs() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [jobs, setJobs] = useState(null);
   const [error, setError] = useState(null);
-  const { accessToken, isLoading } = useAuthenticatedUser();
+  const { getAccessTokenSilently, isAuthenticated, isLoading } = useAuthenticatedUser();
 
-  useEffect(() => {
-    if (isLoading) return;
-    if (!accessToken) {
-      setError("Sign in to see your job recommendations.");
-      return;
-    }
+ const fetchJobs_wrapper = useCallback(async () => {
+    const accessToken = await getAccessTokenSilently();
     fetchJobs(accessToken)
       .then(setJobs)
       .catch((err) => {
         console.error(err);
         setError("Couldn't load jobs. Is the backend running?");
       });
-  }, [accessToken, isLoading]);
+  })
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) {
+      setError("Sign in to see recommendations");
+      return;
+    };
+    fetchJobs_wrapper();
+  }, [fetchJobs_wrapper, isLoading, isAuthenticated]);
 
   return (
     <div className="min-h-screen bg-white">
