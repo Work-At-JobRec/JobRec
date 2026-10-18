@@ -238,6 +238,36 @@ def profile():
     return jsonify(status="processing", user_info=None)
 
 
+# Remove a single skill (matched by name, case-insensitive) from the user's profile
+@app.route("/api/profile/skills", methods=["DELETE"])
+@require_auth
+def remove_skill():
+    user_id = get_user_id()
+    skill_name = (request.get_json(silent=True) or {}).get("skill_name")
+    if not skill_name:
+        return Response(status=400)
+
+    normalized = skill_name.strip().lower()
+    with Session(engine) as session:
+        stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
+        user_info_raw = session.scalars(stmt).one_or_none()
+        if user_info_raw is None or not user_info_raw.done_processing:
+            return Response(status=404)
+        try:
+            user_info = UserInfo.model_validate(user_info_raw.info)
+        except:
+            return Response(status=404)
+
+        user_info.skills = [
+            s for s in user_info.skills if s.skill_name.strip().lower() != normalized
+        ]
+        # Assign a fresh dict so SQLAlchemy detects the change to the JSON column
+        user_info_raw.info = user_info.model_dump()
+        session.commit()
+
+    return jsonify(status="done", user_info=user_info.model_dump())
+
+
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 

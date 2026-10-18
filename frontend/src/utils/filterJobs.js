@@ -37,6 +37,25 @@ function includes(haystack, needle) {
   return (haystack ?? "").toLowerCase().includes(needle.trim().toLowerCase());
 }
 
+// The filters currently narrowing results, each with a label and the change that removes it.
+export function activeFilters(filters) {
+  const active = [];
+  if (filters.keywords.trim()) active.push({ label: `Search: ${filters.keywords.trim()}`, reset: { keywords: "" } });
+  if (filters.location.trim()) active.push({ label: `Location: ${filters.location.trim()}`, reset: { location: "" } });
+  if (String(filters.salaryMin).trim() || String(filters.salaryMax).trim()) {
+    const min = String(filters.salaryMin).trim() || "any";
+    const max = String(filters.salaryMax).trim() || "any";
+    active.push({ label: `Salary: $${min} – $${max} / ${filters.salaryPer}`, reset: { salaryMin: "", salaryMax: "" } });
+  }
+  if (filters.positionTypes.length)
+    active.push({ label: `Type: ${filters.positionTypes.join(", ")}`, reset: { positionTypes: [] } });
+  if (filters.positionName.trim())
+    active.push({ label: `Position: ${filters.positionName.trim()}`, reset: { positionName: "" } });
+  if (filters.companyName.trim())
+    active.push({ label: `Company: ${filters.companyName.trim()}`, reset: { companyName: "" } });
+  return active;
+}
+
 export function filterJobs(jobs, filters) {
   const keywords = filters.keywords.trim().toLowerCase().split(/\s+/).filter(Boolean);
   // Match on the city only, so "West Lafayette" finds "West Lafayette, IN".

@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar.jsx";
 import Avatar from "../components/Avatar.jsx";
 import MenuItem from "../components/MenuItem.jsx";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
-
+import { useNavigate } from "react-router-dom";
 
 const PLACEHOLDER_CONTACT = {
   name: "Jane Smith",
@@ -16,7 +16,10 @@ function LeftPanel({ processing, userInfo, onUpload }) {
   const contact = userInfo ?? PLACEHOLDER_CONTACT;
 
   return (
-    <section className="border-r border-[#bdbdbd] text-center flex flex-col justify-center p-[34px_34px_40px] md:border-r md:border-b-0 border-b">
+    <section className="border-r border-[#bdbdbd] text-center p-[34px_34px_40px] md:border-r md:border-b-0 border-b">
+      {/* Center within one viewport height (minus navbar and padding) rather than the whole
+          section, so the panel doesn't drift down when the right panel grows after parsing */}
+      <div className="flex flex-col justify-center md:min-h-[calc(100vh-58px-74px)]">
       <h1 className="m-0 mb-6 text-[30px] font-bold">Your Profile</h1>
       {contact.name && <p className="m-0 text-2xl font-bold">{contact.name}</p>}
       {contact.email && <p className="m-0 mt-1 text-2xl font-bold">{contact.email}</p>}
@@ -54,11 +57,12 @@ function LeftPanel({ processing, userInfo, onUpload }) {
           </form>
         </>
       )}
+      </div>
     </section>
   );
 }
 
-function RightPanel({ userInfo }) {
+function RightPanel({ userInfo, onRemoveSkill }) {
   if (userInfo) {
     return (
       <section className="relative flex flex-col justify-center p-[34px_34px_40px]">
@@ -90,13 +94,25 @@ function RightPanel({ userInfo }) {
           </ul>
 
           <MenuItem label="Skills:" />
-          <ul>
-            {userInfo.skills.map((skill, i) => (
-              <li key={i}>
-                {skill.skill_name}: {skill.proficiency_level}/4
-              </li>
+          {/* Proficiency levels stay in the database for recommendations but aren't shown */}
+          <div className="flex flex-wrap gap-2">
+            {userInfo.skills.map((skill) => (
+              <span
+                key={skill.skill_name}
+                className="inline-flex items-center gap-1.5 border-2 border-[#E75A8F] rounded-full py-1 pl-3 pr-2 text-base"
+              >
+                {skill.skill_name}
+                <button
+                  type="button"
+                  onClick={() => onRemoveSkill(skill.skill_name)}
+                  aria-label={`Remove ${skill.skill_name}`}
+                  className="w-5 h-5 inline-flex items-center justify-center rounded-full text-[#E75A8F] hover:bg-[#E75A8F] hover:text-white transition-colors leading-none"
+                >
+                  ×
+                </button>
+              </span>
             ))}
-          </ul>
+          </div>
 
           <MenuItem label="Socials:" />
           <ul>
@@ -143,46 +159,64 @@ function ProcessingRightPanel() {
 }
 
 export default function Profile() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState("loading");
   const [userInfo, setUserInfo] = useState(null);
   const [userPersonal, setUserpersonal] = useState(null);
   const pollTimer = useRef(null);
-  const { isAuthenticated, isLoading,  accessToken} = useAuthenticatedUser();
+  const {
+    isAuthenticated,
+    isLoading,
+    getAccessTokenSilently,
+    error: authError,
+  } = useAuthenticatedUser();
 
   const fetchProfile = useCallback(async () => {
-    try { 
-      const res = await fetch("/api/profile", {headers: {
-          Authorization: `Bearer ${accessToken}`
-        }});
-      const data = await res.json();
-      setStatus(data.status);
-      setUserInfo(data.user_info ?? null);
-    } catch (err) {
-      console.error("Failed to fetch profile status", err);
+  try {
+    const token = await getAccessTokenSilently();
+
+    const res = await fetch("/api/profile", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Profile request failed: ${res.status}`);
     }
-  }, [accessToken]);
+
+    const data = await res.json();
+    setStatus(data.status);
+    setUserInfo(data.user_info ?? null);
+
+  } catch (err) {
+    console.error("Failed to fetch profile:", err);
+    setStatus("error");
+  }
+}, [getAccessTokenSilently]);
 
   useEffect(() => {
-    if (status === "empty") {
-      window.location.href = "/onboarding"
-    }
-  }, [fetchProfile, status])
+  if (status === "empty") {
+    navigate("/onboarding", { replace: true });
+  }
+}, [status, navigate]);
 
   useEffect(() => {
-    if(accessToken){
-      fetchProfile();
-    }
-  }, [accessToken]);
+  if (isAuthenticated && !isLoading) {
+    fetchProfile();
+  }
+}, [isAuthenticated, isLoading, fetchProfile]);
 
   useEffect(() => {
     if (status !== "processing") return;
     pollTimer.current = setInterval(fetchProfile, 2000);
     return () => clearInterval(pollTimer.current);
-  }, [status, fetchProfile, accessToken]);
+  }, [status, fetchProfile]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
     const fileInput = e.target.elements.resume;
+    const token = await getAccessTokenSilently();
     if (!fileInput.files.length) return;
 
     const formData = new FormData();
@@ -190,9 +224,32 @@ export default function Profile() {
 
     setStatus("processing");
     await fetch("/upload", { method: "POST", body: formData, headers: {
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${token}`
         }});
     fetchProfile();
+  };
+
+  const handleRemoveSkill = async (skillName) => {
+    // Remove immediately so the chip disappears on click; resync if the server rejects it
+    setUserInfo((prev) => ({
+      ...prev,
+      skills: prev.skills.filter((s) => s.skill_name !== skillName),
+    }));
+    try {
+      const token = await getAccessTokenSilently();
+      const res = await fetch("/api/profile/skills", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ skill_name: skillName }),
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+    } catch (err) {
+      console.error("Failed to remove skill", err);
+      fetchProfile();
+    }
   };
 
   const processing = status === "processing";
@@ -203,7 +260,7 @@ export default function Profile() {
         <Navbar />
         <main className="grid md:grid-cols-[42%_58%] grid-cols-1 min-h-[calc(100vh-58px)] items-stretch">
           <LeftPanel processing={processing} userInfo={userInfo} onUpload={handleUpload} />
-          {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} />}
+          {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} onRemoveSkill={handleRemoveSkill} />}
         </main>
       </div>
     </div>
