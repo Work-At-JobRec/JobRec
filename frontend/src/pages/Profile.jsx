@@ -12,6 +12,28 @@ const PLACEHOLDER_CONTACT = {
   address: "West Lafayette, IN",
 };
 
+// The backend doesn't report parsing progress, so estimate it: ease toward 95% and
+// hold there until the profile poll reports the parse is done
+function ResumeProgress() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress((p) => p + (95 - p) * 0.02);
+    }, 200);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="relative mx-auto my-[30px] w-[110px] h-[110px]">
+      <div className="spinner w-full h-full rounded-full"></div>
+      <div className="absolute inset-0 flex items-center justify-center text-black text-xl font-bold">
+        {Math.floor(progress)}%
+      </div>
+    </div>
+  );
+}
+
 function LeftPanel({ processing, userInfo, onUpload }) {
   const contact = userInfo ?? PLACEHOLDER_CONTACT;
 
@@ -36,7 +58,7 @@ function LeftPanel({ processing, userInfo, onUpload }) {
       {processing ? (
         <>
           <div className="text-black text-2xl mt-2 mb-[18px]">Parsing resume...</div>
-          <div className="spinner mx-auto my-[30px] w-[110px] h-[110px] rounded-full"></div>
+          <ResumeProgress />
         </>
       ) : (
         <>
@@ -51,7 +73,12 @@ function LeftPanel({ processing, userInfo, onUpload }) {
             <br />
             <br />
             <input type="file" id="resume" name="resume" accept=".pdf,.doc,.docx" className="hidden" />
-            <input type="submit" value="Submit" />
+            <button
+              type="submit"
+              className="rounded-xl border border-[#ff2d8d] bg-transparent px-8 py-2 text-[17px] font-semibold text-[#ff2d8d] transition-colors hover:bg-[#ff2d8d] hover:text-white cursor-pointer"
+            >
+              Submit
+            </button>
             <br />
             <br />
           </form>
@@ -59,6 +86,86 @@ function LeftPanel({ processing, userInfo, onUpload }) {
       )}
       </div>
     </section>
+  );
+}
+
+const SKILL_PREVIEW_COUNT = 5;
+
+function SkillChips({ skills, onRemoveSkill }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {skills.map((skill) => (
+        <span
+          key={skill.skill_name}
+          className="inline-flex items-center gap-1.5 border-2 border-[#E75A8F] rounded-full py-1 pl-3 pr-2 text-base"
+        >
+          {skill.skill_name}
+          <button
+            type="button"
+            onClick={() => onRemoveSkill(skill.skill_name)}
+            aria-label={`Remove ${skill.skill_name}`}
+            className="w-5 h-5 inline-flex items-center justify-center rounded-full text-[#E75A8F] hover:bg-[#E75A8F] hover:text-white transition-colors leading-none"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Show a short preview of skills; the full list opens in a pop-up so it doesn't flood the profile
+function SkillsList({ skills, onRemoveSkill }) {
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    if (!showAll) return;
+    const onKeyDown = (e) => e.key === "Escape" && setShowAll(false);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showAll]);
+
+  return (
+    <>
+      <SkillChips skills={skills.slice(0, SKILL_PREVIEW_COUNT)} onRemoveSkill={onRemoveSkill} />
+      {skills.length > SKILL_PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="mt-3 bg-transparent text-base font-semibold text-black hover:text-[#ff2d8d] transition-colors cursor-pointer"
+        >
+          See more ({skills.length - SKILL_PREVIEW_COUNT})
+        </button>
+      )}
+
+      {showAll && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+          onClick={() => setShowAll(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="All skills"
+            className="zoom-in relative w-full max-w-[520px] max-h-[70vh] overflow-y-auto rounded-2xl border-[1.5px] border-black bg-[#fcfcfc] p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="m-0 text-xl font-bold">All skills</h3>
+              <button
+                type="button"
+                onClick={() => setShowAll(false)}
+                aria-label="Close"
+                className="w-7 h-7 inline-flex items-center justify-center rounded-full text-xl text-black hover:text-[#ff2d8d] transition-colors leading-none cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+            <SkillChips skills={skills} onRemoveSkill={onRemoveSkill} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -95,24 +202,7 @@ function RightPanel({ userInfo, onRemoveSkill }) {
 
           <MenuItem label="Skills:" />
           {/* Proficiency levels stay in the database for recommendations but aren't shown */}
-          <div className="flex flex-wrap gap-2">
-            {userInfo.skills.map((skill) => (
-              <span
-                key={skill.skill_name}
-                className="inline-flex items-center gap-1.5 border-2 border-[#E75A8F] rounded-full py-1 pl-3 pr-2 text-base"
-              >
-                {skill.skill_name}
-                <button
-                  type="button"
-                  onClick={() => onRemoveSkill(skill.skill_name)}
-                  aria-label={`Remove ${skill.skill_name}`}
-                  className="w-5 h-5 inline-flex items-center justify-center rounded-full text-[#E75A8F] hover:bg-[#E75A8F] hover:text-white transition-colors leading-none"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+          <SkillsList skills={userInfo.skills} onRemoveSkill={onRemoveSkill} />
 
           <MenuItem label="Socials:" />
           <ul>

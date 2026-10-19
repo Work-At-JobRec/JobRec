@@ -35,31 +35,40 @@ export default function Onboarding() {
        
       }, [accessToken, formData]);
       
+      const label = "block mb-2 text-left text-[17px] font-bold text-black";
+      const input = "w-full border-[1.5px] border-black rounded-full px-4 py-2 bg-transparent text-black outline-none focus:border-[#ff2d8d]";
+
       return (
-        <div className="flex flex-col items-center min-h-screen pt-20 text-center">
+        <div className="flex flex-col items-center min-h-screen text-center">
+          <Navbar />
           <div className="text-[96px] font-bold text-black mt-20 mb-5">Welcome, new user</div>
-          <div className="text-[22px] text-black text-center">Complete your profile:</div>
-          
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-6 mb-6 md:grid-cols-2">
+          <div className="text-[22px] text-black text-center mb-[30px]">Complete your profile:</div>
+
+          <form onSubmit={handleSubmit} className="w-full max-w-[640px] px-4">
+            <div className="grid gap-6 mb-8 md:grid-cols-2">
                 <div>
-                    <label for="name" className="block mb-2.5 text-sm font-medium text-heading">Name</label>
-                    <input type="text" id="name" name="name" className="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                    <label htmlFor="name" className={label}>Name</label>
+                    <input type="text" id="name" name="name" className={input} required />
                 </div>
                 <div>
-                    <label for="email" className="block mb-2.5 text-sm font-medium text-heading">Email</label>
-                    <input type="email" id="email" name="email" className="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                    <label htmlFor="email" className={label}>Email</label>
+                    <input type="email" id="email" name="email" className={input} required />
                 </div>
                 <div>
-                    <label for="phone" className="block mb-2.5 text-sm font-medium text-heading">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" className="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                    <label htmlFor="phone" className={label}>Phone Number</label>
+                    <input type="tel" id="phone" name="phone" className={input} required />
                 </div>
                 <div>
-                    <label for="address" className="block mb-2.5 text-sm font-medium text-heading">Address</label>
-                    <input type="text" id="address" name="address" className="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-3 py-2.5 shadow-xs text-body" required />
+                    <label htmlFor="address" className={label}>Address</label>
+                    <input type="text" id="address" name="address" className={input} required />
                 </div>
             </div>
-            <button type="submit" class="text-black bg-brand box-border border">Submit</button>
+            <button
+              type="submit"
+              className="rounded-xl border border-[#ff2d8d] bg-transparent px-8 py-2 text-[17px] font-semibold text-[#ff2d8d] transition-colors hover:bg-[#ff2d8d] hover:text-white cursor-pointer"
+            >
+              Submit
+            </button>
           </form>
         </div>
       );
