@@ -32,7 +32,7 @@ export default function JobDetail() {
         console.error(err);
         setError("Couldn't load this job. Is the backend running?");
       });
-  }, [id, fetchJob]);
+  }, [id, fetchJob, getAccessTokenSilently]);
 
   useEffect(() => {
     setJob(undefined);

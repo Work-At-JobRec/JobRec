@@ -22,7 +22,7 @@ export default function Jobs() {
         console.error(err);
         setError("Couldn't load jobs. Is the backend running?");
       });
-  })
+  }, [getAccessTokenSilently])
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) {
