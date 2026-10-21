@@ -10,7 +10,7 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-from jobrec.link_check import LinkStatus, check_link  # noqa: E402
+from jobrec.link_check import GREENHOUSE_JOB_URL, LinkStatus, check_greenhouse_job, check_job_link, check_link  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
 
 URL = "https://acme.com/jobs/123"
@@ -120,3 +120,69 @@ def test_request_sends_user_agent_timeout_and_follows_redirects():
 # An empty address cannot be checked
 def test_empty_url_is_unknown():
     assert check_link("", FakeSession({})).status == LinkStatus.UNKNOWN
+
+
+# --- Greenhouse per-job API (#103): status without touching the careers page ---
+
+API_URL = GREENHOUSE_JOB_URL.format(board_token="acme", job_id="123")
+
+
+def api(outcome):
+    return check_greenhouse_job("acme", "123", FakeSession({API_URL: outcome}))
+
+
+# A 200 answer naming the job means it still exists on the board
+def test_api_answer_with_the_job_is_open():
+    result = api(page(200, '{"id": 123, "title": "Software Engineer", "content": "&lt;p&gt;Apply now&lt;/p&gt;"}'))
+
+    assert result.status == LinkStatus.OPEN
+    assert result.http_status == 200
+    assert "Software Engineer" in result.text
+    assert "Software Engineer" in result.raw
+
+
+# Greenhouse answers 404 for a job that was closed or removed
+def test_api_not_found_is_closed():
+    result = api(page(404, '{"status": 404, "error": "Job not found"}'))
+
+    assert result.status == LinkStatus.CLOSED
+    assert result.http_status == 404
+
+
+# Anything inconclusive stays unknown so pruning never deletes on it
+@pytest.mark.parametrize("outcome", [
+    page(500, "error"),
+    page(429, "slow down"),
+    page(200, "<html>not json</html>"),
+    page(200, '{"id": 999, "title": "Some other job"}'),
+    requests.Timeout("timed out"),
+    requests.ConnectionError("refused"),
+])
+def test_api_failures_and_mismatches_are_unknown(outcome):
+    assert api(outcome).status == LinkStatus.UNKNOWN
+
+
+# check_job_link asks the API first when it knows the board, and only reads the page when the API cannot say
+def test_job_link_uses_the_api_before_the_page():
+    session = FakeSession({API_URL: page(200, '{"id": 123, "title": "Software Engineer"}'), URL: requests.Timeout("timed out")})
+
+    result = check_job_link(URL, session, job_id="123", board_token="acme")
+
+    assert result.status == LinkStatus.OPEN
+    assert session.calls == [API_URL]
+
+
+def test_job_link_falls_back_to_the_page_when_the_api_is_inconclusive():
+    session = FakeSession({API_URL: requests.Timeout("timed out"), URL: page(200, "<h1>Software Engineer</h1>")})
+
+    result = check_job_link(URL, session, job_id="123", board_token="acme")
+
+    assert result.status == LinkStatus.OPEN
+    assert session.calls == [API_URL, URL]
+
+
+def test_job_link_without_a_board_reads_only_the_page():
+    session = FakeSession({URL: page(404, "Not found")})
+
+    assert check_job_link(URL, session, job_id="123").status == LinkStatus.CLOSED
+    assert session.calls == [URL]

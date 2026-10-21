@@ -6,6 +6,7 @@ Anything that merely failed, was blocked, or went somewhere unexpected is
 UNKNOWN, and an ordinary page is OPEN.
 """
 
+import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
@@ -23,6 +24,8 @@ USER_AGENT = "Mozilla/5.0 (compatible; JobRecLinkCheck/1.0; +https://github.com/
 DEFAULT_TIMEOUT = 10
 # Only the start of a page is read; the closed notice, when there is one, is near the top.
 DEFAULT_MAX_BYTES = 200_000
+# Greenhouse's public job board API answers for one job: 200 with the job, 404 when it is gone.
+GREENHOUSE_JOB_URL = "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs/{job_id}"
 
 # Status codes that mean the page itself no longer exists.
 _GONE_STATUSES = (404, 410)
@@ -124,3 +127,58 @@ def check_link(
         return LinkResult(LinkStatus.OPEN, "page loaded", status, final_url, text, raw)
     finally:
         response.close()
+
+
+def check_greenhouse_job(
+    board_token: str, job_id: str, session, timeout: float = DEFAULT_TIMEOUT
+) -> LinkResult:
+    """Ask Greenhouse's job board API whether a job still exists, without touching the careers page.
+
+    Some companies (Roblox, for one) host their careers pages where automated requests
+    never get an answer, while the board API behind them responds at once (#103). A 200
+    that names the job is OPEN, a 404 is CLOSED, and anything else is UNKNOWN.
+    """
+    url = GREENHOUSE_JOB_URL.format(board_token=board_token, job_id=job_id)
+    try:
+        response = session.get(url, timeout=timeout, headers={"User-Agent": USER_AGENT})
+    except requests.RequestException as exc:
+        return LinkResult(LinkStatus.UNKNOWN, f"Greenhouse API request failed: {exc}")
+
+    try:
+        status = response.status_code
+        if status == 404:
+            return LinkResult(LinkStatus.CLOSED, "Greenhouse API: job not found", status, url)
+        if status != 200:
+            return LinkResult(LinkStatus.UNKNOWN, f"Greenhouse API: HTTP {status}", status, url)
+        try:
+            job = response.json()
+        except ValueError:
+            return LinkResult(LinkStatus.UNKNOWN, "Greenhouse API: response is not JSON", status, url)
+        if not isinstance(job, dict) or str(job.get("id")) != str(job_id).strip():
+            return LinkResult(LinkStatus.UNKNOWN, "Greenhouse API: response is for a different job", status, url)
+        # The job's title and description stand in for the page text, so callers that look
+        # for the stored title or company find them in the same fields as for a page.
+        text = clean_text(f"{job.get('title') or ''}\n{job.get('content') or ''}")
+        return LinkResult(LinkStatus.OPEN, "Greenhouse API: job exists", status, url, text, json.dumps(job))
+    finally:
+        response.close()
+
+
+def check_job_link(
+    url: str,
+    session,
+    timeout: float = DEFAULT_TIMEOUT,
+    job_id: Optional[str] = None,
+    board_token: Optional[str] = None,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+) -> LinkResult:
+    """Judge a stored listing's status: through the Greenhouse API when the board is known, else from its page.
+
+    The page is only requested when there is no board to ask or the API could not say.
+    """
+    if board_token and job_id:
+        result = check_greenhouse_job(board_token, job_id, session, timeout=timeout)
+        if result.status is not LinkStatus.UNKNOWN:
+            return result
+        logger.info("Greenhouse API could not settle %s (%s); reading the page instead", url, result.reason)
+    return check_link(url, session, timeout=timeout, job_id=job_id, max_bytes=max_bytes)
