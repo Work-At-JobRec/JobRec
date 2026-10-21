@@ -39,7 +39,12 @@ _UNSAFE_ID_CHARS = ("/", "?", "#")
 
 # Job type as the frontend's filters name it, inferred from words in the title.
 _JOB_TYPE_PATTERNS = (
-    ("Internship", re.compile(r"\b(intern|interns|internship|internships|co-?op)\b", re.IGNORECASE)),
+    (
+        "Internship",
+        re.compile(
+            r"\b(intern|interns|internship|internships|co-?op)\b", re.IGNORECASE
+        ),
+    ),
     ("Part Time", re.compile(r"\bpart[- ]time\b", re.IGNORECASE)),
     ("Contract", re.compile(r"\b(contract|contractor)\b", re.IGNORECASE)),
 )
@@ -136,15 +141,23 @@ def _store_has_listings(engine):
     return engine is not None and count_listings(engine) > 0
 
 
-def get_job_listings(engine=None, limit=None):
+def get_job_listings(engine=None, limit=None, summary=True):
     """Return the listings to show: stored ones (newest first, short descriptions), else the samples."""
     if not _store_has_listings(engine):
         if engine is not None:
-            logger.warning("No stored job listings found; serving the sample listings instead")
+            logger.warning(
+                "No stored job listings found; serving the sample listings instead"
+            )
         return SAMPLE_LISTINGS
     limit = max(1, min(DEFAULT_JOB_LIMIT if limit is None else limit, MAX_JOB_LIMIT))
-    listings = list_recent_listings(engine, limit, description_chars=LIST_DESCRIPTION_CHARS)
-    return [listing for listing in listings if not any(ch in listing.source_job_id for ch in _UNSAFE_ID_CHARS)]
+    listings = list_recent_listings(
+        engine, limit, description_chars=LIST_DESCRIPTION_CHARS if summary else None
+    )
+    return [
+        listing
+        for listing in listings
+        if not any(ch in listing.source_job_id for ch in _UNSAFE_ID_CHARS)
+    ]
 
 
 def infer_job_type(title):
@@ -205,21 +218,6 @@ def to_api_job(listing: JobListing, summary=False) -> dict[str, object]:
     }
 
 
-def get_jobs(engine=None, limit=None):
-    """Return the jobs for the list pages."""
-    return [to_api_job(listing, summary=True) for listing in get_job_listings(engine, limit)]
-
-
-def get_job(id_, engine=None):
-    """Return the job with the given id and its full description, or None if it doesn't exist."""
-    if _store_has_listings(engine):
-        # Ids are "<source>-<source job id>"; source names contain no hyphen, the job id may.
-        source, _, source_job_id = (id_ or "").partition("-")
-        if not source or not source_job_id:
-            return None
-        listing = get_listing(engine, source, source_job_id)
-        return to_api_job(listing) if listing is not None else None
-    return next((to_api_job(listing) for listing in SAMPLE_LISTINGS if job_id(listing) == id_), None)
 def _normalized_skill_name(name: str) -> str:
     return " ".join(name.casefold().split())
 
@@ -349,9 +347,17 @@ def get_jobs(
     user_id: str | None = None,
     desired_salary: float | None = None,
     location: str | None = None,
+    limit: int | None = None,
 ) -> list[dict[str, object]]:
-    if engine is None or user_id is None:
-        return [to_api_job(listing) for listing in get_job_listings()][:MAX_JOB_RESULTS]
+    if engine is None:
+        return [to_api_job(listing, summary=True) for listing in get_job_listings()][
+            :MAX_JOB_RESULTS
+        ]
+    if user_id is None:
+        return [
+            to_api_job(listing, summary=True)
+            for listing in get_job_listings(engine, limit)[:MAX_JOB_RESULTS]
+        ]
     return _ranked_jobs(engine, user_id, desired_salary, location)[:MAX_JOB_RESULTS]
 
 
@@ -362,8 +368,12 @@ def get_job(
     desired_salary: float | None = None,
 ) -> dict[str, object] | None:
     """Return the job with the given id, or None if it doesn't exist."""
-    if engine is None or user_id is None:
-        jobs = [to_api_job(listing) for listing in get_job_listings()]
+    if engine is None:
+        jobs = [to_api_job(listing) for listing in get_job_listings(summary=False)]
+    elif user_id is None:
+        jobs = [
+            to_api_job(listing) for listing in get_job_listings(engine, summary=False)
+        ]
     else:
         jobs = _ranked_jobs(engine, user_id, desired_salary, None)
     return next((job for job in jobs if job["id"] == id_), None)
