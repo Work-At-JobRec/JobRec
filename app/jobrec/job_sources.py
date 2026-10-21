@@ -20,6 +20,7 @@ from jobrec.ashby_scraper import AshbyScraper
 from jobrec.greenhouse_scraper import GreenhouseScraper
 from jobrec.job_store import UpsertResult
 from jobrec.lever_scraper import LeverScraper
+from jobrec.llm_scraper import LlmPageScraper, structured_source_for
 from jobrec.scrape_pipeline import run_scrape_pipeline
 from jobrec.scraper_base import BaseScraper
 from jobrec.workday_scraper import WorkdayScraper
@@ -33,6 +34,7 @@ SCRAPER_TYPES: dict[str, type] = {
     "ashby": AshbyScraper,
     "greenhouse": GreenhouseScraper,
     "lever": LeverScraper,
+    "llm": LlmPageScraper,
     "workday": WorkdayScraper,
 }
 
@@ -78,7 +80,17 @@ def load_sources(path: Path = DEFAULT_SOURCES_PATH) -> list[JobSource]:
 
 
 def build_scraper(source: JobSource) -> BaseScraper:
-    """Construct the scraper that handles a registry entry."""
+    """Construct the scraper that handles a registry entry.
+
+    An ``llm`` entry's id is the careers page URL. A page hosted on a job board that has
+    its own scraper is refused, so structured sources are never read through the model.
+    """
+    if source.scraper == "llm":
+        structured = structured_source_for(source.id)
+        if structured:
+            raise ValueError(
+                f"{source.id} is hosted on a supported job board; use the {structured} scraper instead of llm"
+            )
     scraper_class = SCRAPER_TYPES[source.scraper]
     return scraper_class(source.id, company_name=source.company_name)
 
