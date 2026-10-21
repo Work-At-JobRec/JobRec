@@ -12,7 +12,6 @@ from flask import (
     jsonify,
     Response,
 )
-from werkzeug.utils import secure_filename
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import Session
 from jobrec.openaiapi import (
@@ -26,6 +25,8 @@ from jobrec.job_store import (
     JobListingTable,
 )
 from threading import Thread
+import hashlib
+import uuid
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
@@ -316,6 +317,18 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def upload_filename(user_id, browser_filename: str) -> str:
+    """The name a resume is stored under: the owner's hashed id plus a random token.
+
+    The browser's filename decides only the extension. Two users who both upload
+    "resume.pdf" therefore get two files, nothing a user chooses becomes a path
+    on the server, and the name identifies the owner without exposing their id (#116).
+    """
+    extension = browser_filename.rsplit(".", 1)[1].lower()
+    owner = hashlib.sha256(str(user_id).encode("utf-8")).hexdigest()[:16]
+    return f"{owner}-{uuid.uuid4().hex}.{extension}"
+
+
 def valid_resume_file(filepath):
     try:
         extension = filepath.rsplit(".", 1)[1].lower()
@@ -353,7 +366,6 @@ def upload_file():
     if "resume" not in request.files:
         flash("No file part")
         return redirect(request.url)
-    print(request.files)
     file = request.files["resume"]
     # If the user does not select a file, the browser submits an
     # empty file without a filename.
@@ -361,7 +373,7 @@ def upload_file():
         flash("No selected file")
         return redirect(request.url)
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
+        filename = upload_filename(user_id, file.filename)
         filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(filepath)
         # Check that the uploaded file is actually a valid PDF/DOCX
