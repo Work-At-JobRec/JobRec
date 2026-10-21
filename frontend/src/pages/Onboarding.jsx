@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth0 } from "@auth0/auth0-react";
+import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser";
+import Navbar from "../components/Navbar";
 
 const fields = [
   { name: "name", label: "Name", type: "text" },
@@ -10,8 +11,9 @@ const fields = [
 ];
 
 export default function Onboarding() {
-      const { isAuthenticated, isLoading,  accessToken} = useAuthenticatedUser();
+      const { isAuthenticated, isLoading,  getAccessTokenSilently} = useAuthenticatedUser();
       const [formData, setFormData] = useState(null);
+      const navigate = useNavigate();
       function handleSubmit(e){
         // Prevent the browser from reloading the page
         e.preventDefault();
@@ -22,8 +24,9 @@ export default function Onboarding() {
       }
 
       useEffect(() => {async function send_data() {
-         if(formData && accessToken){
+         if(formData && isAuthenticated && !isLoading){
             try { 
+              const accessToken = await getAccessTokenSilently();
             const res = await fetch("/api/onboarding", {headers: {
                 Authorization: `Bearer ${accessToken}`
                 }, body: formData,
@@ -31,7 +34,7 @@ export default function Onboarding() {
             if(res.status != 200){
                 console.error(`attempt to submit onboarding results got response ${res.status}`)
             } else {
-                window.location.href = "/profile";
+                navigate("/profile");
             }
         } catch (err) {
             console.error("Failed to submit onboarding results", err);
@@ -41,7 +44,7 @@ export default function Onboarding() {
       }
       send_data();
        
-      }, [accessToken, formData]);
+      }, [isAuthenticated, isLoading, formData]);
       
       const label = "block mb-2 text-left text-[17px] font-bold text-black";
       const input = "w-full border-[1.5px] border-black rounded-full px-4 py-2 bg-transparent text-black outline-none focus:border-[#ff2d8d]";
