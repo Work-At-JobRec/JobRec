@@ -1,6 +1,14 @@
-import Navbar from "../components/Navbar.jsx";
-import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth0 } from "@auth0/auth0-react";
+
+const fields = [
+  { name: "name", label: "Name", type: "text" },
+  { name: "email", label: "Email", type: "email" },
+  { name: "phone", label: "Phone Number", type: "tel" },
+  { name: "address", label: "Address", type: "text" },
+];
+
 export default function Onboarding() {
       const { isAuthenticated, isLoading,  accessToken} = useAuthenticatedUser();
       const [formData, setFormData] = useState(null);

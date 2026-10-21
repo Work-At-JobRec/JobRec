@@ -1,4 +1,5 @@
 import os
+import math
 from os import environ as env
 from urllib.parse import urlparse
 from flask import (
@@ -37,6 +38,8 @@ from jobrec.listing_search.find_listings import (
     get_job_recommendations,
 )
 import importlib
+
+from jobrec.job_sources import load_sources, scrape_all
 
 load_dotenv()
 
@@ -162,6 +165,17 @@ def prune_old_jobs():
     raise NotImplementedError
 
 
+@app.route("/api/run_scraper", methods=["POST"])
+@require_auth
+def start_scraper():
+    # TODO: replace with auth0 permission check
+    if False:
+        p = Thread(target=scrape_all, args=[engine, load_sources()])
+        p.start()
+        print("finished scheduling process")
+        return Response(status=200)
+
+
 @app.route("/api/onboarding", methods=["POST"])
 @require_auth
 def complete_onboarding():
@@ -259,13 +273,40 @@ def allowed_file(filename):
 
 
 @app.route("/api/jobs")
+@require_auth
 def jobs_api():
-    return jsonify(get_jobs(engine, limit=request.args.get("limit", type=int)))
+    salary_parameter = request.args.get("desired_salary")
+    desired_salary: float | None = None
+    if salary_parameter is not None:
+        try:
+            desired_salary = float(salary_parameter)
+        except ValueError:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+        if not math.isfinite(desired_salary) or desired_salary <= 0:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+    return jsonify(
+        get_jobs(
+            engine,
+            get_user_id(),
+            desired_salary,
+            request.args.get("location"),
+        )
+    )
 
 
 @app.route("/api/jobs/<job_id>")
-def job_detail_api(job_id):
-    job = get_job(job_id, engine)
+@require_auth
+def job_detail_api(job_id: str):
+    salary_parameter = request.args.get("desired_salary")
+    desired_salary: float | None = None
+    if salary_parameter is not None:
+        try:
+            desired_salary = float(salary_parameter)
+        except ValueError:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+        if not math.isfinite(desired_salary) or desired_salary <= 0:
+            return jsonify(error="desired_salary must be a positive annual amount"), 400
+    job = get_job(job_id, engine, get_user_id(), desired_salary)
     if job is None:
         return jsonify(error="Job not found"), 404
     return jsonify(job)

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import { ClockIcon, DollarIcon, FlagIcon, PinIcon, PushpinIcon } from "../components/Icons.jsx";
 import { compatibilityColor, fetchJob } from "../api/jobs.js";
+import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 
 function Requirement({ text, skill, met }) {
   return (
@@ -20,17 +21,29 @@ export default function JobDetail() {
   // undefined = still loading, null = not found
   const [job, setJob] = useState(undefined);
   const [error, setError] = useState(null);
+  const { getAccessTokenSilently, isAuthenticated, isLoading } = useAuthenticatedUser();
 
-  useEffect(() => {
-    setJob(undefined);
-    setError(null);
-    fetchJob(id)
+
+  const fetchJob_wrapper = useCallback(async () => {
+    const accessToken = await getAccessTokenSilently();
+    fetchJob(id, accessToken)
       .then(setJob)
       .catch((err) => {
         console.error(err);
         setError("Couldn't load this job. Is the backend running?");
       });
-  }, [id]);
+  }, [id, fetchJob, getAccessTokenSilently]);
+
+  useEffect(() => {
+    setJob(undefined);
+    setError(null);
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      setError("Sign in to view this job.");
+      return;
+    }
+    fetchJob_wrapper();
+  }, [id, isLoading, isAuthenticated]);
 
   return (
     <div className="min-h-screen bg-white">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import EmptyJobsState from "../components/EmptyJobsState.jsx";
@@ -6,20 +6,31 @@ import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
 import { ChevronDownIcon, FunnelIcon } from "../components/Icons.jsx";
 import { fetchJobs } from "../api/jobs.js";
+import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 
 export default function Jobs() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [jobs, setJobs] = useState(null);
   const [error, setError] = useState(null);
+  const { getAccessTokenSilently, isAuthenticated, isLoading } = useAuthenticatedUser();
 
-  useEffect(() => {
-    fetchJobs()
+ const fetchJobs_wrapper = useCallback(async () => {
+    const accessToken = await getAccessTokenSilently();
+    fetchJobs(accessToken)
       .then(setJobs)
       .catch((err) => {
         console.error(err);
         setError("Couldn't load jobs. Is the backend running?");
       });
-  }, []);
+  }, [getAccessTokenSilently])
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) {
+      setError("Sign in to see recommendations");
+      return;
+    };
+    fetchJobs_wrapper();
+  }, [fetchJobs_wrapper, isLoading, isAuthenticated]);
 
   return (
     <div className="min-h-screen bg-white">

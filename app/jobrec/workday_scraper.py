@@ -24,8 +24,8 @@ from jobrec.scraper_base import BaseScraper, ScraperRequestError
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PAGE_SIZE = 20
-DEFAULT_MAX_PAGES = 5
+DEFAULT_PAGE_SIZE = 50
+DEFAULT_MAX_PAGES = 10
 
 
 def parse_workday_date(value: Any) -> Optional[datetime]:

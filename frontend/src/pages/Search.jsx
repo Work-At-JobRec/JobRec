@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
 import { ChevronDownIcon, FunnelIcon, SearchIcon } from "../components/Icons.jsx";
 import { fetchJobs } from "../api/jobs.js";
 import EmptyJobsState from "../components/EmptyJobsState.jsx";
-import { EMPTY_FILTERS, POSITION_TYPES, activeFilters, filterJobs } from "../utils/filterJobs.js";
+import { EMPTY_FILTERS, POSITION_TYPES, filterJobs, activeFilters } from "../utils/filterJobs.js";
+import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 
 const pill = "border-[1.5px] border-black rounded-full px-4 py-0.5 bg-transparent outline-none";
 
@@ -159,15 +160,27 @@ export default function Search() {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const { getAccessTokenSilently, isLoading, isAuthenticated } = useAuthenticatedUser();
 
-  useEffect(() => {
-    fetchJobs()
+  const fetchJobs_wrapper = useCallback(async () => {
+    const accessToken = await getAccessTokenSilently();
+    fetchJobs(accessToken)
       .then(setJobs)
       .catch((err) => {
         console.error(err);
         setError("Couldn't load jobs. Is the backend running?");
       });
-  }, []);
+
+
+  }, [getAccessTokenSilently])
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated){
+      setError("Sign in to see recommendations");
+      return error;
+    }
+    fetchJobs_wrapper();
+  }, [fetchJobs_wrapper, isLoading, isAuthenticated]);
 
   const update = (changes) => setFilters((current) => ({ ...current, ...changes }));
   const results = jobs && filterJobs(jobs, filters);

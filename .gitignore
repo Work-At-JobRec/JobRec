@@ -4,3 +4,4 @@ venv/
 *.pyc
 *.db
 .vite/
+!app/user_skills.db

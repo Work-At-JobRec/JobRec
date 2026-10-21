@@ -1,8 +1,10 @@
 import os
 import sys
+from threading import Event
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
 
 # Lets this test import app/src/scrape_pipeline.py
 SRC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -17,6 +19,11 @@ from jobrec.job_store import (
 )  # noqa: E402
 from jobrec.scrape_pipeline import run_scrape_pipeline  # noqa: E402
 from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
+from jobrec.skill_detection import (  # noqa: E402
+    CanonicalSkillTable,
+    DiscoveredSkill,
+    ListingSkillTable,
+)
 
 
 @pytest.fixture
@@ -109,3 +116,46 @@ def test_pipeline_does_not_store_closed_listings(engine):
 
     assert result.inserted == 1
     assert [job.source_job_id for job in list_listings(engine)] == ["1"]
+
+
+def test_listing_skill_detection_overlaps_scraping_and_persists_results(
+    engine, monkeypatch
+):
+    detector_started = Event()
+
+    def detect_skills(document_text, catalog, *, document_type):
+        detector_started.set()
+        return [], [
+            DiscoveredSkill(
+                skill_name="Novel Framework",
+                category="Software Engineering",
+                proficiency_level=3,
+            )
+        ]
+
+    class DetectionAwareScraper(FixedScraper):
+        source_name = "second"
+
+        def fetch_jobs(self):
+            assert detector_started.wait(timeout=2)
+            return [raw_listing(source="second", source_job_id="2")]
+
+    monkeypatch.setattr("jobrec.skill_detection.detect_document_skills", detect_skills)
+    first_listing = raw_listing()
+
+    result = run_scrape_pipeline(
+        engine,
+        [FixedScraper([first_listing]), DetectionAwareScraper([])],
+    )
+
+    assert result.inserted == 2
+    with Session(engine) as session:
+        skill = session.scalars(
+            select(CanonicalSkillTable).where(
+                CanonicalSkillTable.normalized_name == "novel framework"
+            )
+        ).one()
+        associations = list(session.scalars(select(ListingSkillTable)))
+    assert len(associations) == 2
+    assert {association.skill_id for association in associations} == {skill.id}
+    assert {association.proficiency_level for association in associations} == {3}

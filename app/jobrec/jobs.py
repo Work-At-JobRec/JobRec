@@ -18,6 +18,10 @@ placeholders in SAMPLE_MATCHES).
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+import re
+
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
 from jobrec.job_listing import JobListing
 from jobrec.job_store import count_listings, get_listing, list_recent_listings
@@ -35,10 +39,28 @@ _UNSAFE_ID_CHARS = ("/", "?", "#")
 
 # Job type as the frontend's filters name it, inferred from words in the title.
 _JOB_TYPE_PATTERNS = (
-    ("Internship", re.compile(r"\b(intern|interns|internship|internships|co-?op)\b", re.IGNORECASE)),
+    (
+        "Internship",
+        re.compile(
+            r"\b(intern|interns|internship|internships|co-?op)\b", re.IGNORECASE
+        ),
+    ),
     ("Part Time", re.compile(r"\bpart[- ]time\b", re.IGNORECASE)),
     ("Contract", re.compile(r"\b(contract|contractor)\b", re.IGNORECASE)),
 )
+from jobrec.job_store import JobListingTable, to_job_listing
+from jobrec.openaiapi import UserInfoTable
+from jobrec.skill_detection import CanonicalSkillTable, ListingSkillTable
+
+MAX_JOB_RESULTS = 5
+_ANNUAL_MULTIPLIERS = {
+    "year": 1,
+    "annual": 1,
+    "month": 12,
+    "week": 52,
+    "hour": 2080,
+}
+_SALARY_AMOUNT = re.compile(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(k)?", re.IGNORECASE)
 
 _now = datetime.now(timezone.utc)
 
@@ -119,15 +141,23 @@ def _store_has_listings(engine):
     return engine is not None and count_listings(engine) > 0
 
 
-def get_job_listings(engine=None, limit=None):
+def get_job_listings(engine=None, limit=None, summary=True):
     """Return the listings to show: stored ones (newest first, short descriptions), else the samples."""
     if not _store_has_listings(engine):
         if engine is not None:
-            logger.warning("No stored job listings found; serving the sample listings instead")
+            logger.warning(
+                "No stored job listings found; serving the sample listings instead"
+            )
         return SAMPLE_LISTINGS
     limit = max(1, min(DEFAULT_JOB_LIMIT if limit is None else limit, MAX_JOB_LIMIT))
-    listings = list_recent_listings(engine, limit, description_chars=LIST_DESCRIPTION_CHARS)
-    return [listing for listing in listings if not any(ch in listing.source_job_id for ch in _UNSAFE_ID_CHARS)]
+    listings = list_recent_listings(
+        engine, limit, description_chars=LIST_DESCRIPTION_CHARS if summary else None
+    )
+    return [
+        listing
+        for listing in listings
+        if not any(ch in listing.source_job_id for ch in _UNSAFE_ID_CHARS)
+    ]
 
 
 def infer_job_type(title):
@@ -163,7 +193,7 @@ def posted_ago(posted_at):
     return f"{days} Day{'' if days == 1 else 's'} Ago"
 
 
-def to_api_job(listing, summary=False):
+def to_api_job(listing: JobListing, summary=False) -> dict[str, object]:
     """Convert a JobListing into the dict the frontend renders.
 
     With ``summary`` set (the list), a description that was cut short ends in an ellipsis.
@@ -188,18 +218,162 @@ def to_api_job(listing, summary=False):
     }
 
 
-def get_jobs(engine=None, limit=None):
-    """Return the jobs for the list pages."""
-    return [to_api_job(listing, summary=True) for listing in get_job_listings(engine, limit)]
+def _normalized_skill_name(name: str) -> str:
+    return " ".join(name.casefold().split())
 
 
-def get_job(id_, engine=None):
-    """Return the job with the given id and its full description, or None if it doesn't exist."""
-    if _store_has_listings(engine):
-        # Ids are "<source>-<source job id>"; source names contain no hyphen, the job id may.
-        source, _, source_job_id = (id_ or "").partition("-")
-        if not source or not source_job_id:
-            return None
-        listing = get_listing(engine, source, source_job_id)
-        return to_api_job(listing) if listing is not None else None
-    return next((to_api_job(listing) for listing in SAMPLE_LISTINGS if job_id(listing) == id_), None)
+def _annual_salary(salary: str | None) -> float | None:
+    if not salary:
+        return None
+    amounts = [
+        float(value.replace(",", "")) * (1000 if thousands else 1)
+        for value, thousands in _SALARY_AMOUNT.findall(salary)
+    ]
+    if not amounts:
+        return None
+    text = salary.casefold()
+    period = next(
+        (name for name in ("hour", "week", "month", "annual", "year") if name in text),
+        "year",
+    )
+    return (sum(amounts) / len(amounts)) * _ANNUAL_MULTIPLIERS[period]
+
+
+def _salary_score(salary: str | None, desired_salary: float | None) -> float:
+    offered = _annual_salary(salary)
+    if offered is None:
+        return 0.25
+    if desired_salary is None:
+        return 1.0
+    return min(offered / desired_salary, 2.0)
+
+
+def _profile_skills(session: Session, user_id: str) -> dict[str, int]:
+    user = session.get(UserInfoTable, user_id)
+    info = user.info if user is not None and isinstance(user.info, dict) else {}
+    skills: dict[str, int] = {}
+    for skill in info.get("skills", []):
+        if not isinstance(skill, dict) or not isinstance(skill.get("skill_name"), str):
+            continue
+        try:
+            proficiency = int(skill.get("proficiency_level"))
+        except (TypeError, ValueError):
+            continue
+        if 1 <= proficiency <= 4:
+            name = _normalized_skill_name(skill["skill_name"])
+            skills[name] = max(skills.get(name, 0), proficiency)
+    return skills
+
+
+def _ranked_jobs(
+    engine: Engine,
+    user_id: str,
+    desired_salary: float | None,
+    location: str | None,
+) -> list[dict[str, object]]:
+    with Session(engine) as session:
+        applicant_skills = _profile_skills(session, user_id)
+        listing_rows = list(
+            session.scalars(
+                select(JobListingTable)
+                .where(JobListingTable.status == "open")
+                .order_by(JobListingTable.id)
+            )
+        )
+        if not listing_rows:
+            return []
+
+        listing_ids = [row.id for row in listing_rows]
+        skill_rows = session.execute(
+            select(
+                ListingSkillTable.listing_id,
+                CanonicalSkillTable.skill_name,
+                ListingSkillTable.proficiency_level,
+            )
+            .join(
+                CanonicalSkillTable,
+                CanonicalSkillTable.id == ListingSkillTable.skill_id,
+            )
+            .where(ListingSkillTable.listing_id.in_(listing_ids))
+        )
+        requirements_by_listing: dict[int, list[tuple[str, int]]] = {}
+        for listing_id, skill_name, proficiency in skill_rows:
+            requirements_by_listing.setdefault(listing_id, []).append(
+                (skill_name, proficiency)
+            )
+
+        location_query = (location or "").split(",", 1)[0].strip().casefold()
+        ranked: list[tuple[float, int, dict[str, object]]] = []
+        for row in listing_rows:
+            listing = to_job_listing(row)
+            if (
+                location_query
+                and location_query not in (listing.location or "").casefold()
+            ):
+                continue
+
+            requirements = requirements_by_listing.get(row.id, [])
+            denominator = sum(required / 4 for _, required in requirements)
+            numerator = sum(
+                (required / 4)
+                * (applicant_skills.get(_normalized_skill_name(name), 0) / 4)
+                for name, required in requirements
+            )
+            compatibility = numerator / denominator if denominator else 0.0
+            salary_score = _salary_score(listing.pay, desired_salary)
+            search_index = 0.7 * compatibility + 0.3 * salary_score
+            displayed_requirements = [
+                {
+                    "text": f"Requires proficiency level {required}/4",
+                    "skill": name,
+                    "met": applicant_skills.get(_normalized_skill_name(name), 0)
+                    >= required,
+                }
+                for name, required in requirements
+            ]
+            job = to_api_job(listing)
+            job["id"] = f"{listing.source}-{listing.source_job_id or row.id}"
+            job["salary"] = listing.pay
+            job["compatibility"] = round(compatibility * 100)
+            job["requirements"] = displayed_requirements
+            ranked.append((search_index, row.id, job))
+
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        return [job for _, _, job in ranked]
+
+
+def get_jobs(
+    engine: Engine | None = None,
+    user_id: str | None = None,
+    desired_salary: float | None = None,
+    location: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, object]]:
+    if engine is None:
+        return [to_api_job(listing, summary=True) for listing in get_job_listings()][
+            :MAX_JOB_RESULTS
+        ]
+    if user_id is None:
+        return [
+            to_api_job(listing, summary=True)
+            for listing in get_job_listings(engine, limit)[:MAX_JOB_RESULTS]
+        ]
+    return _ranked_jobs(engine, user_id, desired_salary, location)[:MAX_JOB_RESULTS]
+
+
+def get_job(
+    id_: str,
+    engine: Engine | None = None,
+    user_id: str | None = None,
+    desired_salary: float | None = None,
+) -> dict[str, object] | None:
+    """Return the job with the given id, or None if it doesn't exist."""
+    if engine is None:
+        jobs = [to_api_job(listing) for listing in get_job_listings(summary=False)]
+    elif user_id is None:
+        jobs = [
+            to_api_job(listing) for listing in get_job_listings(engine, summary=False)
+        ]
+    else:
+        jobs = _ranked_jobs(engine, user_id, desired_salary, None)
+    return next((job for job in jobs if job["id"] == id_), None)
