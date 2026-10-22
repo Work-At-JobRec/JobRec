@@ -18,11 +18,11 @@ from jobrec.openaiapi import (
     UserInfoTable,
     update_skill_db,
     UserInfo,
-    Base,
     update_user_info,
 )
 from jobrec.job_store import (
     JobListingTable,
+    ensure_job_listing_schema,
 )
 from threading import Thread
 import hashlib
@@ -59,15 +59,12 @@ mock_userid: str = "test|mockuser1"
 
 
 engine = create_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
-Base.metadata.create_all(engine)
+ensure_job_listing_schema(engine)
 
 # Development only: clear user data whenever app starts
 if env.get("DEV") is not None:
     with Session(engine) as session:
         session.execute(delete(UserInfoTable))
-
-Base.metadata.create_all(engine)
-
 
 # Given a user, their search preferences, and a pagination number, return the next page of job search results
 @app.route("/api/job_feed", methods=["GET"])

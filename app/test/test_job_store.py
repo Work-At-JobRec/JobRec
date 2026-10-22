@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 # Lets this test import app/src/job_store.py
@@ -15,6 +15,7 @@ from jobrec.job_store import (  # noqa: E402
     JobListingTable,
     UpsertResult,
     count_listings,
+    ensure_job_listing_schema,
     list_listings,
     listing_key,
     upsert_listings,
@@ -389,3 +390,14 @@ def test_upsert_retries_once_when_another_run_inserts_the_same_key(engine, monke
 
     assert len(calls) == 2
     assert result.inserted == 1
+
+
+def test_existing_database_adds_skill_pending_column(engine):
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE job_listings DROP COLUMN skills_pending"))
+
+    ensure_job_listing_schema(engine)
+
+    assert "skills_pending" in {
+        column["name"] for column in inspect(engine).get_columns("job_listings")
+    }
