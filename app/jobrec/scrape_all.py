@@ -7,6 +7,10 @@ listings scraped here are what the application serves. Each source runs on its
 own: one that fails is reported and the rest still run. The exit status is
 non-zero when any source failed or when the database ends up with no listings,
 so a scheduled run that silently stored nothing shows up as a failure.
+
+New listings and listings with changed descriptions are marked for deferred
+skill analysis. Run ``python -m jobrec.listing_skill_extractor`` separately to
+process that queue; scraping itself does not call the OpenAI skill detector.
 """
 
 import argparse
@@ -18,10 +22,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import Engine
 
-from jobrec.db import Base, make_engine
+from jobrec.db import make_engine
 from jobrec.job_sources import DEFAULT_SOURCES_PATH, JobSource, load_sources
 from jobrec.job_sources import scrape_all as scrape_registry
-from jobrec.job_store import JobListingTable, UpsertResult, count_listings  # noqa: F401  (registers the table before create_all)
+from jobrec.job_store import (
+    JobListingTable,
+    UpsertResult,
+    count_listings,
+    ensure_job_listing_schema,
+)  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +63,7 @@ def main() -> int:
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     engine = make_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
-    Base.metadata.create_all(engine)
+    ensure_job_listing_schema(engine)
 
     results, failures = scrape_sources(engine, load_sources(args.sources))
     for name, result in results:

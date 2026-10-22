@@ -7,12 +7,12 @@ from typing import cast
 
 from openai import OpenAI
 from pydantic import BaseModel, Field, create_model
-from sqlalchemy import ForeignKey, Integer, String, select
+from sqlalchemy import ForeignKey, Integer, String, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from jobrec.db import Base
-from jobrec.job_store import JobListingTable
+from jobrec.job_store import JobListingTable, ensure_job_listing_schema
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ def _constrained_result_model(
 
 
 def initialize_skill_schema(engine: Engine) -> None:
-    Base.metadata.create_all(engine)
+    ensure_job_listing_schema(engine)
 
 
 def get_skill_catalog(engine: Engine) -> list[str]:
@@ -141,17 +141,23 @@ def persist_discovered_skills(engine: Engine, skills: list[DiscoveredSkill]) -> 
         return
     initialize_skill_schema(engine)
     with Session(engine) as session:
-        existing = set(session.scalars(select(CanonicalSkillTable.normalized_name)))
-        for skill in skills:
-            normalized = _normalized_name(skill.skill_name)
-            if normalized and normalized not in existing:
-                session.add(
-                    CanonicalSkillTable(
-                        normalized_name=normalized, skill_name=skill.skill_name.strip()
-                    )
-                )
-                existing.add(normalized)
+        _persist_discovered_skills(session, skills)
         session.commit()
+
+
+def _persist_discovered_skills(
+    session: Session, skills: list[DiscoveredSkill]
+) -> None:
+    existing = set(session.scalars(select(CanonicalSkillTable.normalized_name)))
+    for skill in skills:
+        normalized = _normalized_name(skill.skill_name)
+        if normalized and normalized not in existing:
+            session.add(
+                CanonicalSkillTable(
+                    normalized_name=normalized, skill_name=skill.skill_name.strip()
+                )
+            )
+            existing.add(normalized)
 
 
 def detect_document_skills(
@@ -160,7 +166,11 @@ def detect_document_skills(
     *,
     document_type: str,
 ) -> tuple[list[SkillRanking], list[DiscoveredSkill]]:
-    """Run catalog-constrained detection followed by discovery of missing skills."""
+    """Detect catalog matches, then discover novel skills.
+
+    A non-empty catalog requires two Responses API requests per document; an
+    empty catalog skips the constrained request and requires one.
+    """
     if not document_text.strip():
         return [], []
 
@@ -271,31 +281,84 @@ def store_listing_skills(
         return
     initialize_skill_schema(engine)
     with Session(engine) as session:
-        listings = {
-            row.dedupe_key: row
-            for row in session.scalars(
-                select(JobListingTable).where(
-                    JobListingTable.dedupe_key.in_(skills_by_key)
-                )
-            )
-        }
-        catalog = {
-            row.normalized_name: row
-            for row in session.scalars(select(CanonicalSkillTable))
-        }
-        for key, rankings in skills_by_key.items():
-            listing = listings.get(key)
-            if listing is None:
-                continue
-            session.query(ListingSkillTable).filter_by(listing_id=listing.id).delete()
-            for ranking in rankings:
-                skill = catalog.get(_normalized_name(ranking.skill_name))
-                if skill is not None:
-                    session.add(
-                        ListingSkillTable(
-                            listing_id=listing.id,
-                            skill_id=skill.id,
-                            proficiency_level=ranking.proficiency_level,
-                        )
-                    )
+        _store_listing_skills(session, skills_by_key)
         session.commit()
+
+
+def _store_listing_skills(
+    session: Session,
+    skills_by_key: dict[str, list[SkillRanking]],
+) -> None:
+    listings = {
+        row.dedupe_key: row
+        for row in session.scalars(
+            select(JobListingTable).where(
+                JobListingTable.dedupe_key.in_(skills_by_key)
+            )
+        )
+    }
+    catalog = {
+        row.normalized_name: row
+        for row in session.scalars(select(CanonicalSkillTable))
+    }
+    for key, rankings in skills_by_key.items():
+        listing = listings.get(key)
+        if listing is None:
+            continue
+        session.query(ListingSkillTable).filter_by(listing_id=listing.id).delete()
+        for ranking in rankings:
+            skill = catalog.get(_normalized_name(ranking.skill_name))
+            if skill is not None:
+                session.add(
+                    ListingSkillTable(
+                        listing_id=listing.id,
+                        skill_id=skill.id,
+                        proficiency_level=ranking.proficiency_level,
+                    )
+                )
+
+
+def save_listing_skill_analysis(
+    engine: Engine,
+    dedupe_key: str,
+    description: str,
+    matched: list[SkillRanking],
+    discovered: list[DiscoveredSkill],
+) -> bool:
+    """Persist a result only if it still matches the listing's current description."""
+    initialize_skill_schema(engine)
+    with Session(engine) as session:
+        listing = session.scalar(
+            select(JobListingTable).where(
+                JobListingTable.dedupe_key == dedupe_key,
+                JobListingTable.skills_pending.is_(True),
+            )
+        )
+        if listing is None or listing.description != description:
+            return False
+
+        _persist_discovered_skills(session, discovered)
+        session.flush()
+        updated = session.execute(
+            update(JobListingTable)
+            .where(
+                JobListingTable.id == listing.id,
+                JobListingTable.description == description,
+                JobListingTable.skills_pending.is_(True),
+            )
+            .values(skills_pending=False)
+        )
+        if updated.rowcount != 1:
+            session.rollback()
+            return False
+
+        rankings = matched + [
+            SkillRanking(
+                skill_name=skill.skill_name,
+                proficiency_level=skill.proficiency_level,
+            )
+            for skill in discovered
+        ]
+        _store_listing_skills(session, {dedupe_key: rankings})
+        session.commit()
+        return True

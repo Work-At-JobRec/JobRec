@@ -56,6 +56,7 @@ def test_detectors_use_distinct_validated_output_models(monkeypatch):
         document_type="resume",
     )
 
+    assert len(requested_formats) == 2
     assert requested_formats[0].__name__ == "ConstrainedSkillResult"
     assert requested_formats[1] is UnconstrainedSkillResult
     schema = requested_formats[0].model_json_schema()

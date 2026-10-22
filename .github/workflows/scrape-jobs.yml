@@ -10,8 +10,8 @@ on:
       sources:
         description: Registry file in app/jobrec to scrape
         default: job_sources_demo.json
-      detect_skills:
-        description: Expose OPENAI_API_KEY to the run (LLM calls per listing cost money)
+      enable_llm_scrapers:
+        description: Allow configured LLM fallback scrapers to call OpenAI
         type: boolean
         default: false
   schedule:
@@ -54,11 +54,14 @@ jobs:
       - name: Scrape
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DETECT_SKILLS: ${{ inputs.detect_skills }}
+          ENABLE_LLM_SCRAPERS: ${{ inputs.enable_llm_scrapers }}
         run: |
           set -o pipefail
-          # Without the key, any per-listing LLM step fails fast and the listings are still stored.
-          if [ "$DETECT_SKILLS" != "true" ]; then unset OPENAI_API_KEY; fi
+          if [ "$ENABLE_LLM_SCRAPERS" != "true" ]; then unset OPENAI_API_KEY; fi
+          if [ "$ENABLE_LLM_SCRAPERS" = "true" ] && [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY is required when LLM fallback scrapers are enabled."
+            exit 1
+          fi
           poetry run python -m jobrec.scrape_all --sources "jobrec/$SOURCES" | tee "$RUNNER_TEMP/scrape.txt"
       - name: Summary
         if: always()
