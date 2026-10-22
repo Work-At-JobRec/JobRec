@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from jobrec.db import make_engine
 from jobrec.job_store import JobListingTable
 from jobrec.skill_detection import (
+    DEFAULT_SKILL_CANDIDATE_CAP,
     detect_document_skills,
     get_skill_catalog,
     save_listing_skill_analysis,
@@ -32,11 +33,16 @@ class ExtractionResult:
 
 
 def extract_pending_listing_skills(
-    engine: Engine, *, limit: int = DEFAULT_LIMIT
+    engine: Engine,
+    *,
+    limit: int = DEFAULT_LIMIT,
+    candidate_cap: int = DEFAULT_SKILL_CANDIDATE_CAP,
 ) -> ExtractionResult:
     """Analyze up to ``limit`` pending listings, leaving failures queued for retry."""
     if limit < 1:
         raise ValueError("limit must be at least 1")
+    if candidate_cap < 1:
+        raise ValueError("candidate_cap must be at least 1")
 
     catalog = get_skill_catalog(engine)
     with Session(engine) as session:
@@ -55,10 +61,12 @@ def extract_pending_listing_skills(
     result = ExtractionResult()
     for dedupe_key, description in pending:
         try:
+            catalog = get_skill_catalog(engine)
             matched, discovered = detect_document_skills(
                 description,
                 catalog,
                 document_type="job listing",
+                candidate_cap=candidate_cap,
             )
             saved = save_listing_skill_analysis(
                 engine, dedupe_key, description, matched, discovered
@@ -73,11 +81,14 @@ def extract_pending_listing_skills(
             result.stale += 1
 
     with Session(engine) as session:
-        result.pending = session.scalar(
-            select(func.count())
-            .select_from(JobListingTable)
-            .where(JobListingTable.skills_pending.is_(True))
-        ) or 0
+        result.pending = (
+            session.scalar(
+                select(func.count())
+                .select_from(JobListingTable)
+                .where(JobListingTable.skills_pending.is_(True))
+            )
+            or 0
+        )
     return result
 
 
@@ -95,9 +106,20 @@ def main(argv: list[str] | None = None, *, engine: Engine | None = None) -> int:
         default=DEFAULT_LIMIT,
         help=f"maximum pending listings to analyze per run (default: {DEFAULT_LIMIT})",
     )
+    parser.add_argument(
+        "--candidate-cap",
+        type=int,
+        default=DEFAULT_SKILL_CANDIDATE_CAP,
+        help=(
+            "maximum BM25-ranked catalog candidates passed to the model per listing "
+            f"(default: {DEFAULT_SKILL_CANDIDATE_CAP})"
+        ),
+    )
     args = parser.parse_args(argv)
     if args.limit < 1:
         parser.error("--limit must be at least 1")
+    if args.candidate_cap < 1:
+        parser.error("--candidate-cap must be at least 1")
 
     if engine is None:
         load_dotenv()
@@ -108,7 +130,9 @@ def main(argv: list[str] | None = None, *, engine: Engine | None = None) -> int:
             env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db")
         )
 
-    result = extract_pending_listing_skills(engine, limit=args.limit)
+    result = extract_pending_listing_skills(
+        engine, limit=args.limit, candidate_cap=args.candidate_cap
+    )
     print(
         f"Skill extraction: {result.processed} processed, {result.failed} failed, "
         f"{result.stale} changed during analysis, {result.pending} still pending"

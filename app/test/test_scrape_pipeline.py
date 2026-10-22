@@ -171,7 +171,9 @@ def test_pending_skill_extractor_saves_results_and_skips_completed_listings(
     run_scrape_pipeline(engine, [FixedScraper([raw_listing()])])
     calls = []
 
-    def detect_skills(document_text, catalog, *, document_type):
+    def detect_skills(
+        document_text, catalog, *, document_type, candidate_cap
+    ):
         calls.append((document_text, document_type))
         return [], [
             DiscoveredSkill(
@@ -226,6 +228,23 @@ def test_pending_skill_extractor_respects_limit(engine, monkeypatch):
 
     assert result.processed == 1
     assert result.pending == 1
+
+
+def test_pending_skill_extractor_passes_candidate_cap(engine, monkeypatch):
+    run_scrape_pipeline(engine, [FixedScraper([raw_listing()])])
+    received = []
+
+    def detect_skills(document_text, catalog, *, document_type, candidate_cap):
+        received.append(candidate_cap)
+        return [], []
+
+    monkeypatch.setattr(
+        "jobrec.listing_skill_extractor.detect_document_skills", detect_skills
+    )
+
+    extract_pending_listing_skills(engine, limit=1, candidate_cap=25)
+
+    assert received == [25]
 
 
 def test_failed_skill_extraction_remains_pending(engine, monkeypatch):
