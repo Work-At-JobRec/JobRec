@@ -5,3 +5,6 @@ venv/
 *.db
 .vite/
 !app/user_skills.db
+# Uploaded resumes are deleted after parsing (#115); never commit one
+app/uploads/*
+!app/uploads/test_resume.pdf
