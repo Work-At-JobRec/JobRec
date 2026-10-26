@@ -1,0 +1,13 @@
+[Unit]
+Description=uWSGI instance for the JobRec backend
+After=network.target
+
+[Service]
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/jobrec/app
+Environment="DEPLOYMENT=True"
+ExecStart=/home/ec2-user/.local/bin/poetry run uwsgi --http-socket 127.0.0.1:5001 import=jobrec.app callable=app --processes 4 --threads 2 --stats 127.0.0.1:9191
+
+[Install]
+WantedBy=multi-user.target

@@ -31,7 +31,7 @@ jobs:
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r frontend $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
                 sudo dnf install nginx python3 python3-devel pip make automake gcc gcc-c++
-                pip install wheel poetry uwsgi
+                pip install wheel poetry
                 # backend setup
                 cd /opt/jobrec/tmp
                 cp -rf app/ ..
@@ -47,9 +47,8 @@ jobs:
                 cp -rf frontend/ ..
                 cd ../frontend/
                 npm install
-                npm run build
+                npx vite build
                 cd ../app/
-                sudo cp -f deploy/jobrec_frontend.service /etc/systemd/system/jobrec_frontend.service
                 sudo cp -f deploy/nginx/jobrec_frontend /etc/nginx/sites-available/jobrec_frontend
                 sudo ln -s /etc/nginx/sites-available/jobrec_frontend /etc/nginx/sites-enabled/jobrec
                 # enable all services
@@ -58,8 +57,6 @@ jobs:
                 sudo systemctl restart nginx.service
                 sudo systemctl enable --now jobrec.service
                 sudo systemctl restart jobrec.service
-                sudo systemctl enable --now jobrec_frontend.service
-                sudo systemctl restart jobrec_frontend.service
                 ENDSSH
                 rm lightsail_key.pem
                 
