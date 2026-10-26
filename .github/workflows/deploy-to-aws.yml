@@ -1,0 +1,67 @@
+name: Deploy to AWS
+on:
+    push:
+        branches: ["main"]
+
+permissions:
+    contents: read
+
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Copy Files to Lightsail
+              env:
+                PEM_KEY: ${{ secrets.LIGHTSAIL_PEM_KEY }}
+                LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+                LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP}}
+              run: |
+                echo "$PEM_KEY" > lightsail_key.pem
+                chmod 600 lightsail_key.pem
+                # make directories before copy
+                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
+                sudo mkdir -p /opt/jobrec/tmp
+                sudo chown -R ${{ secrets.LIGHTSAIL_USER }} /opt/jobrec
+                chmod -R 770 /opt/jobrec
+                ENDSSH
+                # copy files
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r app $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r frontend $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
+                sudo dnf install nginx python3 python3-devel pip make automake gcc gcc-c++
+                pip install wheel poetry uwsgi
+                # backend setup
+                cd /opt/jobrec/tmp
+                cp -rf app/ ..
+                cd ../app/
+                poetry install
+                sudo cp -f deploy/jobrec.service /etc/systemd/system/jobrec.service
+                sudo cp -f deploy/nginx/jobrec /etc/nginx/sites-available/jobrec
+                sudo ln -s /etc/nginx/sites-available/jobrec /etc/nginx/sites-enabled/jobrec
+                sudo unlink /etc/nginx/sites-enabled/default
+                # frontend setup
+                sudo dnf install nodejs
+                cd /opt/jobrec/tmp
+                cp -rf frontend/ ..
+                cd ../frontend/
+                npm install
+                npm run build
+                cd ../app/
+                sudo cp -f deploy/jobrec_frontend.service /etc/systemd/system/jobrec_frontend.service
+                sudo cp -f deploy/nginx/jobrec_frontend /etc/nginx/sites-available/jobrec_frontend
+                sudo ln -s /etc/nginx/sites-available/jobrec_frontend /etc/nginx/sites-enabled/jobrec
+                # enable all services
+                sudo systemctl daemon-reload
+                sudo systemctl enable --now nginx.service
+                sudo systemctl restart nginx.service
+                sudo systemctl enable --now jobrec.service
+                sudo systemctl restart jobrec.service
+                sudo systemctl enable --now jobrec_frontend.service
+                sudo systemctl restart jobrec_frontend.service
+                ENDSSH
+                rm lightsail_key.pem
+                
+
+                
