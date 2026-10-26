@@ -18,6 +18,7 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center min-h-screen text-center">
       <Navbar />
+      <div className="page-zoom flex flex-col items-center">
       <div className="text-[96px] font-bold text-black mt-20 mb-5">JobRec</div>
       <div className="text-[22px] max-w-[800px] text-black mb-[30px] leading-relaxed">
         The applicant-focused job board you didn't know you needed!
@@ -34,6 +35,7 @@ export default function Home() {
         : isAuthenticated ?<div >welcome, {user.name}</div>: <div>not logged in...
         </div>
         }
+      </div>
       </div>
     </div>
   );

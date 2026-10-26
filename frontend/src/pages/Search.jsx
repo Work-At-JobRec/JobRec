@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
@@ -170,15 +170,15 @@ export default function Search() {
         console.error(err);
         setError("Couldn't load jobs. Is the backend running?");
       });
-
-
-  })
+  }, [getAccessTokenSilently]);
 
   useEffect(() => {
-    if (isLoading || !isAuthenticated){
+    if (isLoading) return;
+    if (!isAuthenticated) {
       setError("Sign in to see recommendations");
-      return error;
+      return;
     }
+    setError(null);
     fetchJobs_wrapper();
   }, [fetchJobs_wrapper, isLoading, isAuthenticated]);
 
@@ -189,7 +189,7 @@ export default function Search() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      <main className="max-w-[1400px] mx-auto px-6 pb-16">
+      <main className="page-zoom max-w-[1400px] mx-auto px-6 pb-16">
         <h1 className="text-center text-[56px] font-bold mt-24 mb-12">Here are the Best Jobs For You:</h1>
 
         <div className="max-w-[1100px] mx-auto">
