@@ -1,0 +1,19 @@
+limit_req_zone $binary_remote_addr zone=mylimit:10m rate=7r/s;
+
+server{
+        listen 80 default_server;
+
+        location /api {
+                uwsgi_pass 127.0.0.1:3031;
+                include uwsgi_params;
+        }
+
+        location / {
+            root /opt/jobrec/frontend/dist
+        }
+}
+
+map $http_upgrade $connection_upgrade{
+        default upgrade;
+        '' close;
+}

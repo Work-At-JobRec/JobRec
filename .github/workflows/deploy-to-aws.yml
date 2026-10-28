@@ -5,13 +5,30 @@ on:
 
 permissions:
     contents: read
-
+    # Need ID token write permission to use OIDC:
+    id-token: write
 
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
         steps:
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v6.3.0
+              with:
+                role-to-assume: arn:aws:secretsmanager:us-east-2:853255354248:secret:jobrec_envars-azGH9Y
+                aws-region: us-east-2
             - uses: actions/checkout@v4
+            - name: Get AWS secrets
+              uses: aws-actions/aws-secretsmanager-get-secrets@v3
+              with:
+                secret-ids: |
+                    jobrec_envars
+                name-transformation: uppercase
+            - name: Generate env file
+              run: |
+                sudo apt install python
+                echo $JOBREC_ENVARS > env.json
+                python app/helpers/json_to_env.py env.json .env
             - name: Copy Files to Lightsail
               env:
                 PEM_KEY: ${{ secrets.LIGHTSAIL_PEM_KEY }}
@@ -29,12 +46,14 @@ jobs:
                 # copy files
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r app $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r frontend $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem .env $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
                 sudo dnf install nginx python3 python3-devel pip make automake gcc gcc-c++
                 pip install wheel poetry
                 # backend setup
                 cd /opt/jobrec/tmp
                 cp -rf app/ ..
+                cp -f .env ../app/
                 cd ../app/
                 poetry install
                 sudo cp -f deploy/jobrec.service /etc/systemd/system/jobrec.service
@@ -45,20 +64,21 @@ jobs:
                 sudo dnf install nodejs
                 cd /opt/jobrec/tmp
                 cp -rf frontend/ ..
+                cp -f .env ..
                 cd ../frontend/
                 npm install
                 npx vite build
                 cd ../app/
-                sudo cp -f deploy/nginx/jobrec_frontend /etc/nginx/sites-available/jobrec_frontend
-                sudo ln -s /etc/nginx/sites-available/jobrec_frontend /etc/nginx/sites-enabled/jobrec
                 # enable all services
                 sudo systemctl daemon-reload
                 sudo systemctl enable --now nginx.service
-                sudo systemctl restart nginx.service
+                sudo nginx -s reload
                 sudo systemctl enable --now jobrec.service
                 sudo systemctl restart jobrec.service
                 ENDSSH
+                # cleanup
                 rm lightsail_key.pem
+                rm .env
                 
 
                 
