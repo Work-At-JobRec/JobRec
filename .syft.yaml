@@ -1,0 +1,28 @@
+# Syft configuration for docs/SBOM.json (see .github/workflows/sbom.yml).
+# The SBOM lists the packages installed for the build: the backend's Poetry
+# virtualenv (app/.venv) and the frontend's node_modules. Lockfiles are not
+# catalogued because neither poetry.lock nor package-lock.json records licenses,
+# and installed package metadata does.
+exclude:
+  - "./.git/**"
+  - "./frontend/package.json"
+  - "**/node_modules/**/test/**"
+  - "**/node_modules/**/tests/**"
+  - "**/node_modules/**/fixtures/**"
+  - "**/node_modules/**/example/**"
+  - "**/node_modules/**/examples/**"
+select-catalogers:
+  - "-python-package-cataloger"
+  - "-javascript-lock-cataloger"
+  - "-github-actions-usage-cataloger"
+  - "-go-module-binary-cataloger"
+  - "-pe-binary-package-cataloger"
+  - "+javascript-package-cataloger"
+file:
+  metadata:
+    selection: none
+python:
+  search-remote-licenses: true
+javascript:
+  search-remote-licenses: true
+  include-dev-dependencies: true
