@@ -60,6 +60,9 @@ jobs:
           --source-name jobrec --source-version "$version" \
           -o cyclonedx-json=docs/SBOM.json
 
+    - name: Fill licenses declared only as classifiers
+      run: python .github/scripts/fill_sbom_licenses.py docs/SBOM.json
+
     - name: Check SBOM
       run: python .github/scripts/check_sbom.py docs/SBOM.json
 
