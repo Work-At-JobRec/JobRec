@@ -1,0 +1,39 @@
+=== TC-015 live Workday crawl, first 5 pages per site | run at 2026-10-30T20:46:31+00:00 UTC
+    python 3.11.9 on Windows 10
+    5 Workday sites from jobrec/job_sources_demo.json; page size 20 (Workday now rejects 50, issue #148)
+--- NVIDIA (nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite)
+    page offset   0: 20 postings
+    page offset  20: 20 postings
+    page offset  40: 20 postings
+    page offset  60: 20 postings
+    page offset  80: 20 postings
+    site reports 2000 open postings; crawled 5 pages; 100 listings built; 100 distinct ids -> PASS
+--- Salesforce (salesforce.wd12.myworkdayjobs.com/External_Career_Site)
+    page offset   0: 20 postings
+    page offset  20: 20 postings
+    page offset  40: 20 postings
+    page offset  60: 20 postings
+    page offset  80: 20 postings
+    site reports 1561 open postings; crawled 5 pages; 100 listings built; 100 distinct ids -> PASS
+--- Intel (intel.wd1.myworkdayjobs.com/External)
+    page offset   0: 20 postings
+    page offset  20: 20 postings
+    page offset  40: 20 postings
+    page offset  60: 20 postings
+    page offset  80: 20 postings
+    site reports 803 open postings; crawled 5 pages; 100 listings built; 100 distinct ids -> PASS
+--- Adobe (adobe.wd5.myworkdayjobs.com/external_experienced)
+    page offset   0: 20 postings
+    page offset  20: 20 postings
+    page offset  40: 20 postings
+    page offset  60: 20 postings
+    page offset  80: 20 postings
+    site reports 284 open postings; crawled 5 pages; 100 listings built; 100 distinct ids -> PASS
+--- Caterpillar (cat.wd5.myworkdayjobs.com/CaterpillarCareers)
+    page offset   0: 20 postings
+    page offset  20: 20 postings
+    page offset  40: 20 postings
+    page offset  60: 20 postings
+    page offset  80: 20 postings
+    site reports 946 open postings; crawled 5 pages; 100 listings built; 100 distinct ids -> PASS
+TC-015 RESULT: PASS

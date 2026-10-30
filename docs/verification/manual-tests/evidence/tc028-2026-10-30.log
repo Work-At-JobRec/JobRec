@@ -1,0 +1,9 @@
+=== TC-028 duplicate and repeated listings | run at 2026-10-30T20:46:03+00:00 UTC
+    python 3.11.9 on Windows 10
+    reusing the TC-027 database <scratch>/tc027.db: 609 rows before the repeat scrape
+    re-scraped greenhouse:figma: 0 inserted, 0 updated, 140 unchanged
+    re-scraped lever:palantir: 0 inserted, 0 updated, 299 unchanged
+    re-scraped ashby:ramp: 0 inserted, 0 updated, 170 unchanged
+    rows after repeat scrape: 609; (source, job id) pairs stored more than once: 0
+    same listing submitted twice with a changed title: 0 inserted, 1 updated; rows 609; stored title now: Account Executive, Enterprise (repost)
+TC-028 RESULT: PASS (no duplicate rows; a repeat sighting updates the existing row)

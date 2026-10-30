@@ -1,0 +1,35 @@
+## TC-017 run 2026-10-24T20:37Z on postgres:16 container jobrec-pg (localhost:5433)
+
+$ python tc017_seed.py seed
+seeded: 8 inserted (4 open from the live Palantir board, 4 closed)
+after seeding: 8 listings
+  lever       Administrative Business Partner               https://jobs.lever.co/palantir/6ed76ce8-4156-4b60-b120-403538bd66cd
+  lever       Administrative Business Partner               https://jobs.lever.co/palantir/ac978161-6f46-4f6b-ad9e-a258e642751c
+  lever       Administrative Business Partner - ShipOS      https://jobs.lever.co/palantir/a237973c-cb29-41fe-9c80-416e6f42e087
+  lever       Administrative Business Partner - ShipOS      https://jobs.lever.co/palantir/a5f93bb6-4f13-4451-80a4-f63090830269
+  lever       Retired Lever posting A                       https://jobs.lever.co/palantir/00000000-0000-0000-0000-000000000001
+  lever       Retired Lever posting B                       https://jobs.lever.co/palantir/00000000-0000-0000-0000-000000000002
+  greenhouse  Retired Greenhouse posting A                  https://job-boards.greenhouse.io/figma/jobs/1
+  greenhouse  Retired Greenhouse posting B                  https://job-boards.greenhouse.io/figma/jobs/2
+
+$ python -m jobrec.prune_jobs --delete
+WARNING jobrec.job_pruning: Could not determine whether https://jobs.lever.co/palantir/a5f93bb6-4f13-4451-80a4-f63090830269 is still open; keeping it: request failed: HTTPSConnectionPool(host='jobs.lever.co', port=443): Read timed out. (read timeout=10)
+INFO jobrec.job_pruning: Closed: Retired Lever posting A at Palantir (https://jobs.lever.co/palantir/00000000-0000-0000-0000-000000000001): HTTP 404
+INFO jobrec.job_pruning: Closed: Retired Lever posting B at Palantir (https://jobs.lever.co/palantir/00000000-0000-0000-0000-000000000002): HTTP 404
+INFO jobrec.job_pruning: Closed: Retired Greenhouse posting A at Figma (https://job-boards.greenhouse.io/figma/jobs/1): Greenhouse API: job not found
+INFO jobrec.job_pruning: Closed: Retired Greenhouse posting B at Figma (https://job-boards.greenhouse.io/figma/jobs/2): Greenhouse API: job not found
+INFO jobrec.job_pruning: Pruning: 8 checked, 4 closed, 4 removed, 3 still open, 1 undetermined
+Checked 8 links: removed 4 closed listings, 3 still open, 1 undetermined (kept).
+exit 0
+
+$ python tc017_seed.py verify
+after pruning: 4 listings
+  lever       Administrative Business Partner               https://jobs.lever.co/palantir/6ed76ce8-4156-4b60-b120-403538bd66cd
+  lever       Administrative Business Partner               https://jobs.lever.co/palantir/ac978161-6f46-4f6b-ad9e-a258e642751c
+  lever       Administrative Business Partner - ShipOS      https://jobs.lever.co/palantir/a237973c-cb29-41fe-9c80-416e6f42e087
+  lever       Administrative Business Partner - ShipOS      https://jobs.lever.co/palantir/a5f93bb6-4f13-4451-80a4-f63090830269
+TC-017 RESULT: PASS (4 remain, 0 closed listings still present)
+
+$ psql: select count(*) from job_listings
+     4
+

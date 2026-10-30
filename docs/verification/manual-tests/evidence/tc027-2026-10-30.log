@@ -1,0 +1,34 @@
+=== TC-027 scraped listings stored correctly | run at 2026-10-30T20:45:41+00:00 UTC
+    python 3.11.9 on Windows 10
+    fresh database <scratch>/tc027.db
+    controlled sources: Figma (Greenhouse), Palantir (Lever), Ramp (Ashby)
+    scraped greenhouse:figma: 140 inserted, 0 updated, 0 unchanged
+    scraped lever:palantir: 299 inserted, 0 updated, 0 unchanged
+    scraped ashby:ramp: 170 inserted, 0 updated, 0 unchanged
+    failed sources: none; rows stored: 609
+     1. Ramp | Director, Strategic Finance | New York, NY (HQ) | all 5 fields match
+     2. Palantir | International Accountant | London, United Kingdom | all 5 fields match
+     3. Palantir | Neurodivergent Fellowship | New York, NY | all 5 fields match
+     4. Palantir | Deployment Strategist, Internship - Warp Speed | New York, NY | all 5 fields match
+     5. Figma | Manager, Software Engineering - Billing | San Francisco, CA • New York, NY • United States | all 5 fields match
+     6. Figma | Manager, Mid-Market Sales (London, United Kingdom) | London, England | all 5 fields match
+     7. Palantir | Forward Deployed Software Engineer, Internship - UK Governme | London, United Kingdom | all 5 fields match
+     8. Ramp | Product Operations Specialist | Juno | New York, NY (HQ) | all 5 fields match
+     9. Palantir | Senior Revenue Accountant | London, United Kingdom | all 5 fields match
+    10. Palantir | Forward Deployed Software Engineer, Internship - Commercial | Chicago, IL | all 5 fields match
+    11. Palantir | Software Engineer, Internship | Denver, CO | all 5 fields match
+    12. Palantir | Support Engineer | London, United Kingdom | all 5 fields match
+    13. Palantir | Deployment Strategist - US Government | Fayetteville, NC | all 5 fields match
+    14. Palantir | Forward Deployed Software Engineer - Warp Speed | New York, NY | all 5 fields match
+    15. Palantir | Forward Deployed Software Engineer - US Government | Norfolk, VA | all 5 fields match
+    16. Ramp | Senior Product Partnerships Manager | New York, NY (HQ) | all 5 fields match
+    17. Figma | Manager, Software Engineering - AI Infrastructure | San Francisco, CA • New York, NY • United States | all 5 fields match
+    18. Ramp | Business Lead | New York, NY (HQ) | all 5 fields match
+    19. Figma | Manager, Software Engineering - Production Engineering | San Francisco, CA • New York, NY • United States | all 5 fields match
+    20. Palantir | Year at Palantir - Forward Deployed Software Engineer, Inter | New York, NY | all 5 fields match
+    21. Palantir | U.S. Indirect Tax Manager | Palo Alto, CA | all 5 fields match
+    22. Figma | Field Engineer | San Francisco, CA • New York, NY • United States | all 5 fields match
+    23. Ramp | Account Manager | Mid-Market | New York, NY (HQ) | all 5 fields match
+    24. Palantir | Site Reliability Operations Analyst - US Government | Washington, D.C. | all 5 fields match
+    25. Figma | Account Executive, SMB | San Francisco, CA • New York, NY | all 5 fields match
+TC-027 RESULT: 25/25 sampled listings identical to the live source -> PASS
