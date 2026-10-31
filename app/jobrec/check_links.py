@@ -77,6 +77,7 @@ def check_stored_links(
 
     report = LinkReport()
     seen_hosts: set[str] = set()
+    ashby_boards: dict = {}  # each Ashby board is read once per run (#150)
     for title, company, url, source, job_id in rows:
         host = (urlsplit(url).hostname or "").lower()
         if host in seen_hosts:
@@ -84,7 +85,7 @@ def check_stored_links(
         seen_hosts.add(host)
 
         board_token = board_tokens.get(company.strip().lower()) if source == "greenhouse" else None
-        link = check_job_link(url, session, job_id=job_id, board_token=board_token)
+        link = check_job_link(url, session, job_id=job_id, board_token=board_token, ashby_boards=ashby_boards)
         report.sampled += 1
         if link.http_status != 200 or link.status is LinkStatus.CLOSED:
             report.problems.append((url, link.reason))
