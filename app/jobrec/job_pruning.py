@@ -163,6 +163,7 @@ def prune_closed_listings(
     closed_by_host: dict[str, list[PruneCandidate]] = {}
     checked_by_host: dict[str, int] = {}
     failures_in_a_row: dict[str, int] = {}
+    ashby_boards: dict = {}  # each Ashby board is read once per run (#150)
 
     for candidate in candidates:
         host = candidate.host
@@ -173,7 +174,10 @@ def prune_closed_listings(
             sleep(pause)
 
         board_token = board_tokens.get(candidate.company_name.strip().lower()) if candidate.source == "greenhouse" else None
-        link = check_job_link(candidate.application_url, session, job_id=candidate.source_job_id, board_token=board_token)
+        link = check_job_link(
+            candidate.application_url, session, job_id=candidate.source_job_id, board_token=board_token,
+            ashby_boards=ashby_boards,
+        )
         result.checked += 1
         checked_by_host[host] = checked_by_host.get(host, 0) + 1
 
