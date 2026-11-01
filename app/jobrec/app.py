@@ -212,6 +212,41 @@ def complete_onboarding():
         session.commit()
     return Response(status=200)
 
+@app.route("/api/onboarding/skip", methods=["POST"])
+@require_auth
+def skip_onboarding():
+    user_id = get_user_id()
+
+    with Session(engine) as session:
+        stmt = select(UserInfoTable).where(
+            UserInfoTable.user_id == user_id
+        )
+
+        existing_user = session.scalars(stmt).one_or_none()
+
+        if existing_user is None:
+            empty_profile = UserInfo(
+                name=None,
+                email=None,
+                phone=None,
+                location=None,
+                skills=[],
+                education=[],
+                projects=[],
+                socials=[],
+                employment_history=[],
+            )
+
+            new_user = UserInfoTable(
+                user_id=user_id,
+                info=empty_profile.model_dump(),
+                done_processing=True,
+            )
+
+            session.add(new_user)
+            session.commit()
+
+    return Response(status=200)
 
 # new home page
 @app.route("/")
