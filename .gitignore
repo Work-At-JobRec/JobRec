@@ -5,3 +5,4 @@ venv/
 *.db
 .vite/
 !app/user_skills.db
+*.pem
