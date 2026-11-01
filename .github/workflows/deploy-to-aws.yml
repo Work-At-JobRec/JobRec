@@ -33,20 +33,27 @@ jobs:
               env:
                 PEM_KEY: ${{ secrets.LIGHTSAIL_PEM_KEY }}
                 LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
-                LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP}}
+                LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+                SSL_FULLCHAIN: ${{ secrets.SSL_FULLCHAIN }}
+                SSL_PRIVATE: ${{ secrets.SSL_PRIVATE }}
+                JOBREC_DOMAIN: ${{ secrets.JOBREC_DOMAIN }}
               run: |
                 echo "$PEM_KEY" > lightsail_key.pem
+                echo "$SSL_FULLCHAIN" > fullchain.pem
+                echo "$SSL_PRIVATE" > privkey.pem
                 chmod 600 lightsail_key.pem
                 # make directories before copy
                 ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
                 sudo mkdir -p /opt/jobrec/tmp
-                sudo chown -R ${{ secrets.LIGHTSAIL_USER }} /opt/jobrec
+                sudo chown -R $LIGHTSAIL_USER /opt/jobrec
                 chmod -R 770 /opt/jobrec
                 ENDSSH
                 # copy files
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r app $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r frontend $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem .env $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem fullchain.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem privkey.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
                 sudo dnf install nginx python3.11 python3.11-devel python3.11-pip make automake gcc gcc-c++
                 pip3.11 install wheel poetry
@@ -60,6 +67,9 @@ jobs:
                 poetry install
                 sudo cp -f deploy/jobrec.service /etc/systemd/system/jobrec.service
                 sudo cp -f deploy/nginx/jobrec.conf /etc/nginx/conf.d/jobrec.conf
+                sudo mkdir -p /etc/letsencrypt/live/$JOBREC_DOMAIN/
+                sudo cp -f privkey.pem /etc/letsencrypt/live/$JOBREC_DOMAIN/
+                sudo cp -f fullchain.pem /etc/letsencrypt/live/$JOBREC_DOMAIN/
                 # frontend setup
                 sudo dnf install nodejs
                 cd /opt/jobrec/tmp
@@ -77,7 +87,7 @@ jobs:
                 sudo systemctl restart jobrec.service
                 ENDSSH
                 # cleanup
-                rm lightsail_key.pem
+                rm *.pem
                 rm .env
                 
 

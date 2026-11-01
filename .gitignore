@@ -6,3 +6,4 @@ venv/
 .vite/
 !app/user_skills.db
 *.pem
+ssl/
