@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import random
@@ -17,7 +18,7 @@ sys.path.insert(0, SRC_DIR)
 from jobrec.db import Base  # noqa: E402
 from jobrec.job_listing import JobListing  # noqa: E402
 from jobrec.job_pruning import PruneResult, find_prune_candidates, greenhouse_boards, prune_closed_listings  # noqa: E402
-from jobrec.link_check import GREENHOUSE_JOB_URL  # noqa: E402
+from jobrec.link_check import ASHBY_JOB_BOARD_URL, GREENHOUSE_JOB_URL  # noqa: E402
 from jobrec.job_store import JobListingTable, count_listings, list_listings, upsert_listings  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
 from jobrec import prune_jobs  # noqa: E402
@@ -327,6 +328,34 @@ def test_listings_from_other_sources_are_checked_on_their_page(engine):
 
     assert result.removed == 1
     assert session.calls == ["https://jobs.lever.co/roblox/l1"]
+
+
+# --- #150: Ashby postings are checked through the posting API, one board request per run ---
+
+ASHBY_OPEN = "4c1e8f9a-0b2d-4e6f-8a1b-2c3d4e5f6a7b"
+ASHBY_GONE = "11111111-2222-3333-4444-555555555555"
+
+
+def ashby_url(job_id: str) -> str:
+    return f"https://jobs.ashbyhq.com/cursor/{job_id}"
+
+
+# The board still lists one posting and no longer lists the other: only the second is removed, and no page is read
+def test_ashby_listings_are_pruned_through_the_posting_api(engine):
+    upsert_listings(engine, [make_listing(job_id, source="ashby", company="Cursor", application_url=ashby_url(job_id))
+                             for job_id in (ASHBY_OPEN, ASHBY_GONE)], now=T1)
+    fresh = make_listing("fresh", source="ashby", company="Cursor", application_url=ashby_url("fresh"))
+    upsert_listings(engine, [fresh], now=T2)
+    api_url = ASHBY_JOB_BOARD_URL.format(organization="cursor")
+    board = {"jobs": [{"id": ASHBY_OPEN, "title": "Software Engineer", "isListed": True},
+                      {"id": "fresh", "title": "Software Engineer", "isListed": True}]}
+    session = FakeSession({api_url: page(200, json.dumps(board))})
+
+    result = prune_closed_listings(engine, session, dry_run=False, now=T2, sleep=no_sleep, board_tokens={})
+
+    assert result == PruneResult(checked=2, closed=1, removed=1, kept=1, unknown=0)
+    assert stored_ids(engine) == sorted([ASHBY_OPEN, "fresh"])
+    assert session.calls == [api_url]
 
 
 # Board tokens come from the source registries: Greenhouse entries keyed by company name (or token when there is no name)

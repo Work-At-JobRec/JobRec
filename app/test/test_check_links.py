@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import sys
@@ -11,7 +12,7 @@ SRC_DIR = os.path.abspath(
 sys.path.insert(0, SRC_DIR)
 
 from jobrec.check_links import check_stored_links  # noqa: E402
-from jobrec.link_check import GREENHOUSE_JOB_URL  # noqa: E402
+from jobrec.link_check import ASHBY_JOB_BOARD_URL, GREENHOUSE_JOB_URL  # noqa: E402
 from jobrec.job_listing import JobListing  # noqa: E402
 from jobrec.job_store import upsert_listings  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
@@ -100,5 +101,25 @@ def test_greenhouse_link_is_confirmed_through_the_api_when_the_page_times_out(en
     report = check_stored_links(engine, session, sleep=no_sleep, board_tokens={"roblox": "roblox"})
 
     assert (report.sampled, report.resolved, report.matched) == (1, 1, 1)
+    assert report.problems == []
+    assert session.calls == [api_url]
+
+
+# --- #150: Ashby posting pages are rendered in the browser; the posting API confirms the title, one request per company ---
+def test_ashby_links_are_matched_through_the_posting_api(engine):
+    ids = ["4c1e8f9a-0b2d-4e6f-8a1b-2c3d4e5f6a7b", "11111111-2222-3333-4444-555555555555"]
+    upsert_listings(engine, [
+        JobListing(title=title, company_name="Cursor", source="ashby",
+                   application_url=f"https://jobs.ashbyhq.com/cursor/{job_id}", source_job_id=job_id)
+        for job_id, title in zip(ids, ["Software Engineer, Agents", "Product Designer"])
+    ])
+    api_url = ASHBY_JOB_BOARD_URL.format(organization="cursor")
+    board = {"jobs": [{"id": ids[0], "title": "Software Engineer, Agents", "isListed": True},
+                      {"id": ids[1], "title": "Product Designer", "isListed": True}]}
+    session = FakeSession({api_url: page(200, json.dumps(board))})
+
+    report = check_stored_links(engine, session, sleep=no_sleep, board_tokens={})
+
+    assert (report.sampled, report.resolved, report.matched) == (2, 2, 2)
     assert report.problems == []
     assert session.calls == [api_url]
