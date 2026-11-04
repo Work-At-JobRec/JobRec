@@ -1,0 +1,96 @@
+name: Deploy to AWS
+on:
+    push:
+        branches: ["main"]
+
+permissions:
+    contents: read
+    # Need ID token write permission to use OIDC:
+    id-token: write
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v6.3.0
+              with:
+                role-to-assume: arn:aws:secretsmanager:us-east-2:853255354248:secret:jobrec_envars-azGH9Y
+                aws-region: us-east-2
+            - uses: actions/checkout@v4
+            - name: Get AWS secrets
+              uses: aws-actions/aws-secretsmanager-get-secrets@v3
+              with:
+                secret-ids: |
+                    jobrec_envars
+                name-transformation: uppercase
+            - name: Generate env file
+              run: |
+                sudo apt install python
+                echo $JOBREC_ENVARS > env.json
+                python app/helpers/json_to_env.py env.json .env
+            - name: Copy Files to Lightsail
+              env:
+                PEM_KEY: ${{ secrets.LIGHTSAIL_PEM_KEY }}
+                LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+                LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+                SSL_FULLCHAIN: ${{ secrets.SSL_FULLCHAIN }}
+                SSL_PRIVATE: ${{ secrets.SSL_PRIVATE }}
+                JOBREC_DOMAIN: ${{ secrets.JOBREC_DOMAIN }}
+              run: |
+                echo "$PEM_KEY" > lightsail_key.pem
+                echo "$SSL_FULLCHAIN" > fullchain.pem
+                echo "$SSL_PRIVATE" > privkey.pem
+                chmod 600 lightsail_key.pem
+                # make directories before copy
+                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
+                sudo mkdir -p /opt/jobrec/tmp
+                sudo chown -R $LIGHTSAIL_USER /opt/jobrec
+                chmod -R 770 /opt/jobrec
+                ENDSSH
+                # copy files
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r app $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem -r frontend $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem .env $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem fullchain.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                scp -o StrictHostKeyChecking=no -i lightsail_key.pem privkey.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
+                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
+                sudo dnf install nginx python3.11 python3.11-devel python3.11-pip make automake gcc gcc-c++
+                pip3.11 install wheel poetry
+                # backend setup
+                cd /opt/jobrec/tmp
+                cp -rf app/ ..
+                cp -f .env ../app/
+                cd ../app/
+                # add uWSGI here so windows compatibility is preserved in dev environments
+                poetry add uwsgi
+                poetry install
+                sudo cp -f deploy/jobrec.service /etc/systemd/system/jobrec.service
+                sudo cp -f deploy/*.service /etc/systemd/system
+                sudo cp -f deploy/*.timer /etc/systemd/system/
+                sudo cp -f deploy/nginx/jobrec.conf /etc/nginx/conf.d/jobrec.conf
+                sudo mkdir -p /etc/letsencrypt/live/$JOBREC_DOMAIN/
+                sudo cp -f privkey.pem /etc/letsencrypt/live/$JOBREC_DOMAIN/
+                sudo cp -f fullchain.pem /etc/letsencrypt/live/$JOBREC_DOMAIN/
+                # frontend setup
+                sudo dnf install nodejs
+                cd /opt/jobrec/tmp
+                cp -rf frontend/ ..
+                cp -f .env ..
+                cd ../frontend/
+                npm install
+                chmod +x node_modules/.bin/vite
+                npx vite build
+                # enable all services
+                sudo systemctl daemon-reload
+                sudo systemctl enable --now nginx.service
+                sudo nginx -s reload
+                sudo systemctl enable --now jobrec.service
+                sudo systemctl restart jobrec.service
+                ENDSSH
+                # cleanup
+                rm *.pem
+                rm .env
+                
+
+                

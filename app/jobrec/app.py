@@ -66,6 +66,7 @@ if env.get("DEV") is not None:
     with Session(engine) as session:
         session.execute(delete(UserInfoTable))
 
+
 # Given a user, their search preferences, and a pagination number, return the next page of job search results
 @app.route("/api/job_feed", methods=["GET"])
 @require_auth
@@ -172,6 +173,7 @@ def start_scraper():
         p.start()
         print("finished scheduling process")
         return Response(status=200)
+    return Response(status=401)
 
 
 @app.route("/api/onboarding", methods=["POST"])
