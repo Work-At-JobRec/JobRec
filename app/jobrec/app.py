@@ -18,11 +18,11 @@ from jobrec.openaiapi import (
     UserInfoTable,
     update_skill_db,
     UserInfo,
-    Base,
     update_user_info,
 )
 from jobrec.job_store import (
     JobListingTable,
+    ensure_job_listing_schema,
 )
 from threading import Thread
 import hashlib
@@ -59,15 +59,12 @@ mock_userid: str = "test|mockuser1"
 
 
 engine = create_engine(env.get("DATABASE_URL", "sqlite+pysqlite:///user_skills.db"))
-Base.metadata.create_all(engine)
+ensure_job_listing_schema(engine)
 
 # Development only: clear user data whenever app starts
 if env.get("DEV") is not None:
     with Session(engine) as session:
         session.execute(delete(UserInfoTable))
-
-Base.metadata.create_all(engine)
-
 
 # Given a user, their search preferences, and a pagination number, return the next page of job search results
 @app.route("/api/job_feed", methods=["GET"])
@@ -212,6 +209,41 @@ def complete_onboarding():
         session.commit()
     return Response(status=200)
 
+@app.route("/api/onboarding/skip", methods=["POST"])
+@require_auth
+def skip_onboarding():
+    user_id = get_user_id()
+
+    with Session(engine) as session:
+        stmt = select(UserInfoTable).where(
+            UserInfoTable.user_id == user_id
+        )
+
+        existing_user = session.scalars(stmt).one_or_none()
+
+        if existing_user is None:
+            empty_profile = UserInfo(
+                name=None,
+                email=None,
+                phone=None,
+                location=None,
+                skills=[],
+                education=[],
+                projects=[],
+                socials=[],
+                employment_history=[],
+            )
+
+            new_user = UserInfoTable(
+                user_id=user_id,
+                info=empty_profile.model_dump(),
+                done_processing=True,
+            )
+
+            session.add(new_user)
+            session.commit()
+
+    return Response(status=200)
 
 # new home page
 @app.route("/")

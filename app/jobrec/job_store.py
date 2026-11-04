@@ -12,7 +12,19 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
-from sqlalchemy import DateTime, Engine, Integer, String, Text, func, select
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Engine,
+    Integer,
+    String,
+    Text,
+    func,
+    inspect,
+    select,
+    text,
+    true,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -54,6 +66,9 @@ class JobListingTable(Base):
     application_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     pay: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    skills_pending: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
     posted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -83,6 +98,26 @@ class UpsertResult:
     def existing(self) -> int:
         """Listings that were recognised as already stored, whether or not their details changed."""
         return self.updated + self.unchanged
+
+
+def ensure_job_listing_schema(engine: Engine) -> None:
+    """Create the listing table and add the skill-work flag to existing databases."""
+    Base.metadata.create_all(engine)
+    if not inspect(engine).has_table(JobListingTable.__tablename__):
+        raise RuntimeError("job_listings table was not created")
+
+    columns = {
+        column["name"]
+        for column in inspect(engine).get_columns(JobListingTable.__tablename__)
+    }
+    if "skills_pending" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE job_listings "
+                    "ADD COLUMN skills_pending BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
 
 
 def _squash(value: Optional[str]) -> str:
@@ -201,6 +236,7 @@ def upsert_listings(
     sighting time used for the first/last-seen columns (defaults to the current UTC time).
     """
     now = _to_db(now or datetime.now(timezone.utc))
+    ensure_job_listing_schema(engine)
     by_key: dict[str, JobListing] = {}
     for listing in listings:
         by_key[listing_key(listing)] = listing
@@ -239,15 +275,20 @@ def _upsert_once(engine: Engine, by_key: dict[str, JobListing], now: datetime) -
             if row is None:
                 row = JobListingTable(
                     dedupe_key=key, source=_text_for_db(listing.source, "source"), first_seen_at=now, updated_at=now,
+                    skills_pending=True,
                 )
                 _apply_changes(row, listing)
                 session.add(row)
                 result.inserted += 1
-            elif _apply_changes(row, listing):
-                row.updated_at = now
-                result.updated += 1
             else:
-                result.unchanged += 1
+                description_changed = row.description != _value_for_db(listing, "description")
+                if _apply_changes(row, listing):
+                    row.updated_at = now
+                    result.updated += 1
+                    if description_changed:
+                        row.skills_pending = True
+                else:
+                    result.unchanged += 1
             row.scraped_at = _to_db(listing.scraped_at)
             row.last_seen_at = now
         session.commit()
