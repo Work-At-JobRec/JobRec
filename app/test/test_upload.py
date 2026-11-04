@@ -455,6 +455,34 @@ def test_upload_does_not_print_the_request(tmp_path, capsys):
     assert "Jane_Smith_Resume.pdf" not in captured.out
     assert "ImmutableMultiDict" not in captured.out
 
+@ignore_auth
+def test_skip_onboarding_creates_empty_profile(tmp_path):
+    test_db = tmp_path / "test_skip.db"
+    test_engine = create_engine(
+        f"sqlite+pysqlite:///{test_db}"
+    )
+    Base.metadata.create_all(test_engine)
+
+    client = app.test_client()
+
+    with patch("jobrec.app.engine", test_engine):
+        response = client.post(
+            "/api/onboarding/skip",
+            headers=fake_headers,
+        )
+
+        assert response.status_code == 200
+
+        profile_response = client.get(
+            "/api/profile",
+            headers=fake_headers,
+        )
+
+    data = profile_response.get_json()
+
+    assert data["status"] == "done"
+    assert data["user_info"]["name"] is None
+    assert data["user_info"]["skills"] == []
 
 # --- #115: the uploaded resume is deleted once parsing has finished, and so is the copy sent to OpenAI ---
 
