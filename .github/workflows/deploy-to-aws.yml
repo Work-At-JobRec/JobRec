@@ -24,9 +24,12 @@ jobs:
                 secret-ids: |
                     jobrec_envars
                 name-transformation: uppercase
+            - name: Set Up Python
+              uses: actions/setup-python@v3
+              with:
+                  python-version: "3.11"
             - name: Generate env file
               run: |
-                sudo apt install python
                 echo $JOBREC_ENVARS > env.json
                 python app/helpers/json_to_env.py env.json .env
             - name: Copy Files to Lightsail
