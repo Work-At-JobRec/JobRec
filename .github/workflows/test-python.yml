@@ -43,3 +43,5 @@ jobs:
       run: |
         cd app
         poetry run pytest test/
+    - name: Run frontend unit tests
+      run: node --test frontend/src/utils/filterJobs.test.js

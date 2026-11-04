@@ -3,8 +3,30 @@ import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import { ClockIcon, DollarIcon, FlagIcon, PinIcon, PushpinIcon } from "../components/Icons.jsx";
-import { compatibilityColor, fetchJob } from "../api/jobs.js";
+import { compatibilityColor, fetchJob, reportJob } from "../api/jobs.js";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
+import ReportListingModal from "../components/ReportListingModal.jsx";
+
+// Remembers which jobs this browser has reported so the button stays "Report Listed".
+// Once the backend stores reports, the job API could return a `reported` flag instead.
+const REPORTED_KEY = "reportedJobs";
+
+function loadReported() {
+  try {
+    return JSON.parse(localStorage.getItem(REPORTED_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveReported(id) {
+  try {
+    const ids = loadReported();
+    if (!ids.includes(id)) localStorage.setItem(REPORTED_KEY, JSON.stringify([...ids, id]));
+  } catch {
+    // Storage unavailable; the button still updates for this visit.
+  }
+}
 
 function Requirement({ text, skill, met }) {
   return (
@@ -16,11 +38,50 @@ function Requirement({ text, skill, met }) {
   );
 }
 
+// Scraped descriptions are plain text: short lines ending in ":" are section
+// headings and lines starting with "- " are bullets.
+function Description({ text }) {
+  const blocks = [];
+  for (const raw of (text || "").split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("- ")) {
+      const last = blocks[blocks.length - 1];
+      if (last?.type === "list") last.items.push(line.slice(2));
+      else blocks.push({ type: "list", items: [line.slice(2)] });
+    } else if (line.endsWith(":") && line.length <= 80) {
+      blocks.push({ type: "heading", text: line });
+    } else {
+      blocks.push({ type: "paragraph", text: line });
+    }
+  }
+
+  return (
+    <div className="text-2xl mt-4">
+      {blocks.map((block, i) =>
+        block.type === "heading" ? (
+          <h4 key={i} className="m-0 mt-6 font-bold">{block.text}</h4>
+        ) : block.type === "list" ? (
+          <ul key={i} className="mt-2 pl-8 list-disc">
+            {block.items.map((item, j) => (
+              <li key={j} className="my-1">{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i} className="mt-3">{block.text}</p>
+        )
+      )}
+    </div>
+  );
+}
+
 export default function JobDetail() {
   const { id } = useParams();
   // undefined = still loading, null = not found
   const [job, setJob] = useState(undefined);
   const [error, setError] = useState(null);
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(() => loadReported().includes(id));
   const { getAccessTokenSilently, isAuthenticated, isLoading } = useAuthenticatedUser();
 
 
@@ -37,6 +98,7 @@ export default function JobDetail() {
   useEffect(() => {
     setJob(undefined);
     setError(null);
+    setReported(loadReported().includes(id));
     if (isLoading) return;
     if (!isAuthenticated) {
       setError("Sign in to view this job.");
@@ -48,7 +110,7 @@ export default function JobDetail() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      <main className="max-w-[1100px] mx-auto px-6 pb-16">
+      <main className="page-zoom max-w-[1100px] mx-auto px-6 pb-16">
         <h1 className="text-center text-[56px] font-bold mt-16 mb-10">Here are the Best Jobs For You:</h1>
         <div className="flex justify-center">
           <LocationBar />
@@ -109,13 +171,17 @@ export default function JobDetail() {
                 <h3 className="m-0 text-[36px] font-bold">Role Description</h3>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-3 bg-black text-white text-2xl font-bold rounded-full px-6 py-2"
+                  disabled={reported}
+                  onClick={() => setReporting(true)}
+                  className={`inline-flex items-center gap-3 text-white text-2xl font-bold rounded-full px-6 py-2 transition-colors ${
+                    reported ? "bg-[#E066A3] cursor-default" : "bg-black hover:bg-[#E066A3]"
+                  }`}
                 >
                   <FlagIcon className="w-7 h-7" />
-                  Report Listing
+                  {reported ? "Report Listed" : "Report Listing"}
                 </button>
               </div>
-              <p className="text-2xl mt-4 whitespace-pre-line">{job.description}</p>
+              <Description text={job.description} />
 
               {job.requirements.length > 0 && (
                 <>
@@ -142,6 +208,17 @@ export default function JobDetail() {
           </article>
         )}
       </main>
+
+      {reporting && (
+        <ReportListingModal
+          onSubmit={async (report) => {
+            await reportJob(id, report, await getAccessTokenSilently());
+            saveReported(id);
+            setReported(true);
+          }}
+          onClose={() => setReporting(false)}
+        />
+      )}
     </div>
   );
 }
