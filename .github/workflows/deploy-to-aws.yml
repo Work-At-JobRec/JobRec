@@ -46,7 +46,7 @@ jobs:
                 echo "$SSL_PRIVATE" > privkey.pem
                 chmod 600 lightsail_key.pem
                 # make directories before copy
-                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP << 'ENDSSH'
+                ssh -o StrictHostKeyChecking=no -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP << 'ENDSSH'
                 sudo mkdir -p /opt/jobrec/tmp
                 sudo chown -R $LIGHTSAIL_USER /opt/jobrec
                 chmod -R 770 /opt/jobrec
@@ -57,7 +57,7 @@ jobs:
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem .env $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem fullchain.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem privkey.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
-                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
+                ssh -o StrictHostKeyChecking=no -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
                 sudo dnf install nginx python3.11 python3.11-devel python3.11-pip make automake gcc gcc-c++
                 pip3.11 install wheel poetry
                 # backend setup
