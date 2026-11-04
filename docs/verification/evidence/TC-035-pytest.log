@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.5, pytest-9.1.1, pluggy-1.6.0 -- /Users/sharvarideshpande/Library/Caches/pypoetry/virtualenvs/jobrec-rNbuW_jP-py3.12/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/sharvarideshpande/JobRec Prototype/JobRec/app
+configfile: pytest.ini
+plugins: platformdirs-4.12.3, anyio-4.15.1
+collecting ... collected 1 item
+
+test/test_search_filter_integration.py::test_search_filters_work_on_jobs_from_the_api PASSED [100%]
+
+=============================== warnings summary ===============================
+../../../Library/Caches/pypoetry/virtualenvs/jobrec-rNbuW_jP-py3.12/lib/python3.12/site-packages/auth0_api_python/api_client.py:7
+  /Users/sharvarideshpande/Library/Caches/pypoetry/virtualenvs/jobrec-rNbuW_jP-py3.12/lib/python3.12/site-packages/auth0_api_python/api_client.py:7: AuthlibDeprecationWarning: authlib.jose module is deprecated, please use joserfc instead.
+  It will be compatible before version 2.0.0.
+    from authlib.jose import JsonWebKey, JsonWebToken
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 1 passed, 1 warning in 1.69s =========================

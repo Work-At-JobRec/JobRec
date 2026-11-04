@@ -1,0 +1,55 @@
+TAP version 13
+# Subtest: yearlySalary converts yearly, hourly and monthly pay to a yearly amount
+ok 1 - yearlySalary converts yearly, hourly and monthly pay to a yearly amount
+  ---
+  duration_ms: 4.154375
+  ...
+# Subtest: yearlySalary returns null when there is no number
+ok 2 - yearlySalary returns null when there is no number
+  ---
+  duration_ms: 0.084834
+  ...
+# Subtest: empty filters return every job
+ok 3 - empty filters return every job
+  ---
+  duration_ms: 6.788
+  ...
+# Subtest: keywords must all match, ignoring case, across title, company, description and skills
+ok 4 - keywords must all match, ignoring case, across title, company, description and skills
+  ---
+  duration_ms: 2.183541
+  ...
+# Subtest: location matches on the city, so 'West Lafayette, IN' finds the West Lafayette job
+ok 5 - location matches on the city, so 'West Lafayette, IN' finds the West Lafayette job
+  ---
+  duration_ms: 0.166042
+  ...
+# Subtest: salary range compares yearly amounts and drops jobs whose pay can't be read
+ok 6 - salary range compares yearly amounts and drops jobs whose pay can't be read
+  ---
+  duration_ms: 0.1145
+  ...
+# Subtest: position type, position name and company filters narrow the results
+ok 7 - position type, position name and company filters narrow the results
+  ---
+  duration_ms: 0.279875
+  ...
+# Subtest: filters that match nothing return an empty list (the 'no jobs found' case)
+ok 8 - filters that match nothing return an empty list (the 'no jobs found' case)
+  ---
+  duration_ms: 0.167875
+  ...
+# Subtest: activeFilters lists each filter in use with the change that clears it
+ok 9 - activeFilters lists each filter in use with the change that clears it
+  ---
+  duration_ms: 0.1905
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 217.32475
