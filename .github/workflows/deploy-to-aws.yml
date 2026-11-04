@@ -46,7 +46,7 @@ jobs:
                 echo "$SSL_PRIVATE" > privkey.pem
                 chmod 600 lightsail_key.pem
                 # make directories before copy
-                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
+                ssh -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP << 'ENDSSH'
                 sudo mkdir -p /opt/jobrec/tmp
                 sudo chown -R $LIGHTSAIL_USER /opt/jobrec
                 chmod -R 770 /opt/jobrec
