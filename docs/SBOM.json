@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.7",
-  "serialNumber": "urn:uuid:55116597-da25-48e2-8ec9-65fcd9fcfa80",
+  "serialNumber": "urn:uuid:31468588-734d-4705-939d-de81ebbd6e95",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-29T22:35:45Z",
+    "timestamp": "2026-11-04T23:13:02Z",
     "tools": {
       "components": [
         {
@@ -13964,11 +13964,11 @@
       ]
     },
     {
-      "bom-ref": "pkg:pypi/pip@26.2.2?package-id=7ed25d70e91402c6",
+      "bom-ref": "pkg:pypi/pip@26.3?package-id=a0c5c41a3a62a512",
       "type": "library",
       "author": "The pip developers <distutils-sig@python.org>",
       "name": "pip",
-      "version": "26.2.2",
+      "version": "26.3",
       "licenses": [
         {
           "license": {
@@ -13976,8 +13976,8 @@
           }
         }
       ],
-      "cpe": "cpe:2.3:a:pip_developers_\\<distutils_sig_project:python-pip:26.2.2:*:*:*:*:*:*:*",
-      "purl": "pkg:pypi/pip@26.2.2",
+      "cpe": "cpe:2.3:a:pip_developers_\\<distutils_sig_project:python-pip:26.3:*:*:*:*:*:*:*",
+      "purl": "pkg:pypi/pip@26.3",
       "properties": [
         {
           "name": "syft:package:foundBy",
@@ -13997,115 +13997,115 @@
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig_project:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig_project:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sigproject:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sigproject:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sigproject:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sigproject:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig_project:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig_project:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip-developers-\\<distutils-sig:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip-developers-\\<distutils-sig:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip-developers-\\<distutils-sig:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip-developers-\\<distutils-sig:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sigproject:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sigproject:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip-developers-\\<distutils-sig:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip-developers-\\<distutils-sig:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip_developers_\\<distutils_sig:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python-pip:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python-pip:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python-pip:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python-pip:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python_pip:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python_pip:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python_pip:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python_pip:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pypa:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pypa:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pypa:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pypa:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip:python-pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip:python-pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip:python_pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip:python_pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python-pip:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python-pip:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python_pip:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python_pip:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:python:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:python:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pypa:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pypa:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:pip:pip:26.2.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:pip:pip:26.3:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:location:0:path",
-          "value": "/app/.venv/lib/python3.11/site-packages/pip-26.2.2.dist-info/METADATA"
+          "value": "/app/.venv/lib/python3.11/site-packages/pip-26.3.dist-info/METADATA"
         },
         {
           "name": "syft:location:1:path",
-          "value": "/app/.venv/lib/python3.11/site-packages/pip-26.2.2.dist-info/RECORD"
+          "value": "/app/.venv/lib/python3.11/site-packages/pip-26.3.dist-info/RECORD"
         }
       ]
     },
