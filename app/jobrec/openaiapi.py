@@ -1,3 +1,5 @@
+import logging
+import os
 import traceback
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -17,6 +19,8 @@ from jobrec.skill_detection import (
 )
 
 _ = load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 client = OpenAI()
 
@@ -87,13 +91,42 @@ class UserInfo(BaseModel):
     )
 
 
-def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
+def _remove_uploaded_resume(filename: str) -> None:
+    """Delete the stored upload; the resume is not needed once parsing has finished (#115)."""
     try:
-        user_info = parse_resume(filename, engine)
-    except Exception:
-        traceback.print_exc()
-        user_info = None
+        os.remove(filename)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        logger.exception("Could not delete the uploaded resume %s", filename)
 
+
+def _delete_openai_file(file_id: str) -> None:
+    """Remove the copy of the resume that was uploaded to OpenAI for parsing (#115)."""
+    try:
+        client.files.delete(file_id)
+    except Exception:
+        logger.exception("Could not delete OpenAI file %s", file_id)
+
+
+def update_skill_db(user_id: bytes, engine: sqlalchemy.Engine, filename: str):
+    """Parse the uploaded resume into the user's profile, then delete the upload.
+
+    The file is removed whether or not parsing succeeded, so a resume never
+    outlives the request that needed it (threat model TB1, NFR-003).
+    """
+    try:
+        try:
+            user_info = parse_resume(filename, engine)
+        except Exception:
+            traceback.print_exc()
+            user_info = None
+        _store_parsed_profile(user_id, engine, user_info)
+    finally:
+        _remove_uploaded_resume(filename)
+
+
+def _store_parsed_profile(user_id, engine: sqlalchemy.Engine, user_info) -> None:
     with Session(engine) as session:
 
         stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
@@ -143,24 +176,13 @@ def parse_resume(
     filename: str, engine: sqlalchemy.engine.Engine | None = None
 ) -> UserInfo | None:
 
-    uploaded = client.files.create(file=open(filename, "rb"), purpose="assistants")
-    response = client.responses.parse(
-        model="gpt-5.2",
-        instructions="""You are an HR manager who is an expert in reading and parsing resumes.
-        First, extract the applicant's contact information: their full name, email address, phone number, and location (city/state or region), as listed on the resume.
-        Then, determine the user's employment history, project experience, education, and any linked social media presences.
-        Extract and rank skills as before; when searchable document text is available, a separate skill detector will replace these results with catalog-constrained and newly discovered skills.
-        If any piece of contact information is not present on the resume, leave it null rather than guessing.""",
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_file", "file_id": uploaded.id},
-                ],
-            }
-        ],
-        text_format=UserInfo,
-    )
+    # The handle is closed before the file is deleted later; Windows refuses to delete an open file.
+    with open(filename, "rb") as resume_file:
+        uploaded = client.files.create(file=resume_file, purpose="assistants")
+    try:
+        response = _parse_uploaded_resume(uploaded.id)
+    finally:
+        _delete_openai_file(uploaded.id)
 
     user_info = response.output_parsed
     if user_info is None:
@@ -181,6 +203,26 @@ def parse_resume(
             for skill in discovered
         ]
     return user_info
+
+
+def _parse_uploaded_resume(file_id: str):
+    return client.responses.parse(
+        model="gpt-5.2",
+        instructions="""You are an HR manager who is an expert in reading and parsing resumes.
+        First, extract the applicant's contact information: their full name, email address, phone number, and location (city/state or region), as listed on the resume.
+        Then, determine the user's employment history, project experience, education, and any linked social media presences.
+        Extract and rank skills as before; when searchable document text is available, a separate skill detector will replace these results with catalog-constrained and newly discovered skills.
+        If any piece of contact information is not present on the resume, leave it null rather than guessing.""",
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_file", "file_id": file_id},
+                ],
+            }
+        ],
+        text_format=UserInfo,
+    )
 
 
 def update_user_info(
