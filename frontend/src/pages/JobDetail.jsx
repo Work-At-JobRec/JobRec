@@ -16,6 +16,43 @@ function Requirement({ text, skill, met }) {
   );
 }
 
+// Scraped descriptions are plain text: short lines ending in ":" are section
+// headings and lines starting with "- " are bullets.
+function Description({ text }) {
+  const blocks = [];
+  for (const raw of (text || "").split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("- ")) {
+      const last = blocks[blocks.length - 1];
+      if (last?.type === "list") last.items.push(line.slice(2));
+      else blocks.push({ type: "list", items: [line.slice(2)] });
+    } else if (line.endsWith(":") && line.length <= 80) {
+      blocks.push({ type: "heading", text: line });
+    } else {
+      blocks.push({ type: "paragraph", text: line });
+    }
+  }
+
+  return (
+    <div className="text-2xl mt-4">
+      {blocks.map((block, i) =>
+        block.type === "heading" ? (
+          <h4 key={i} className="m-0 mt-6 font-bold">{block.text}</h4>
+        ) : block.type === "list" ? (
+          <ul key={i} className="mt-2 pl-8 list-disc">
+            {block.items.map((item, j) => (
+              <li key={j} className="my-1">{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i} className="mt-3">{block.text}</p>
+        )
+      )}
+    </div>
+  );
+}
+
 export default function JobDetail() {
   const { id } = useParams();
   // undefined = still loading, null = not found
@@ -48,7 +85,7 @@ export default function JobDetail() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      <main className="max-w-[1100px] mx-auto px-6 pb-16">
+      <main className="page-zoom max-w-[1100px] mx-auto px-6 pb-16">
         <h1 className="text-center text-[56px] font-bold mt-16 mb-10">Here are the Best Jobs For You:</h1>
         <div className="flex justify-center">
           <LocationBar />
@@ -115,7 +152,7 @@ export default function JobDetail() {
                   Report Listing
                 </button>
               </div>
-              <p className="text-2xl mt-4 whitespace-pre-line">{job.description}</p>
+              <Description text={job.description} />
 
               {job.requirements.length > 0 && (
                 <>

@@ -6,6 +6,11 @@ body {
   margin: 0;
 }
 
+/* Matches one Safari "zoom out" step (85%); applied to page content below the navbar */
+.page-zoom {
+  zoom: 0.85;
+}
+
 .avatar::before {
   content: "";
   position: absolute;
