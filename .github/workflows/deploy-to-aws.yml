@@ -15,7 +15,7 @@ jobs:
             - name: Configure AWS Credentials
               uses: aws-actions/configure-aws-credentials@v6.3.0
               with:
-                role-to-assume: arn:aws:secretsmanager:us-east-2:853255354248:secret:jobrec_envars-azGH9Y
+                role-to-assume: arn:aws:iam::853255354248:role/github-actions-access
                 aws-region: us-east-2
             - uses: actions/checkout@v4
             - name: Get AWS secrets
