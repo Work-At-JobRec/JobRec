@@ -6,10 +6,10 @@ import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 import { useNavigate } from "react-router-dom";
 
 const PLACEHOLDER_CONTACT = {
-  name: "Jane Smith",
-  email: "janesmith100@gmail.com",
-  phone: "(+1) 650-890-0093",
-  address: "West Lafayette, IN",
+  name: null,
+  email: null,
+  phone: null,
+  address: null,
 };
 
 // The backend doesn't report parsing progress, so estimate it: ease toward 95% and
@@ -51,6 +51,13 @@ function LeftPanel({ processing, userInfo, onUpload }) {
           <span>📍</span>
           <span>{contact.address}</span>
         </div>
+      )}
+
+      {/* Show placeholder message while parsing */}
+      {!contact.name && processing && (
+        <p className="text-[#8a8a8a] mt-2">
+          Profile information will appear after parsing.
+        </p>
       )}
 
       <Avatar editable={!processing} />
