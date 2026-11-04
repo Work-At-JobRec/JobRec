@@ -48,7 +48,7 @@ jobs:
                 # make directories before copy
                 ssh -o StrictHostKeyChecking=no -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP << 'ENDSSH'
                 sudo mkdir -p /opt/jobrec/tmp
-                sudo chown -R $LIGHTSAIL_USER /opt/jobrec
+                sudo chown -R ${{ secrets.LIGHTSAIL_USER }} /opt/jobrec
                 chmod -R 770 /opt/jobrec
                 ENDSSH
                 # copy files
@@ -57,7 +57,7 @@ jobs:
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem .env $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem fullchain.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
                 scp -o StrictHostKeyChecking=no -i lightsail_key.pem privkey.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP:/opt/jobrec/tmp/
-                ssh -o StrictHostKeyChecking=no -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP: << 'ENDSSH'
+                ssh -o StrictHostKeyChecking=no -i lightsail_key.pem $LIGHTSAIL_USER@$LIGHTSAIL_IP << 'ENDSSH'
                 sudo dnf install nginx python3.11 python3.11-devel python3.11-pip make automake gcc gcc-c++
                 pip3.11 install wheel poetry
                 # backend setup
@@ -72,9 +72,9 @@ jobs:
                 sudo cp -f deploy/*.service /etc/systemd/system
                 sudo cp -f deploy/*.timer /etc/systemd/system/
                 sudo cp -f deploy/nginx/jobrec.conf /etc/nginx/conf.d/jobrec.conf
-                sudo mkdir -p /etc/letsencrypt/live/$JOBREC_DOMAIN/
-                sudo cp -f privkey.pem /etc/letsencrypt/live/$JOBREC_DOMAIN/
-                sudo cp -f fullchain.pem /etc/letsencrypt/live/$JOBREC_DOMAIN/
+                sudo mkdir -p /etc/letsencrypt/live/${{ secrets.JOBREC_DOMAIN }}/
+                sudo cp -f privkey.pem /etc/letsencrypt/live/${{ secrets.JOBREC_DOMAIN }}/
+                sudo cp -f fullchain.pem /etc/letsencrypt/live/${{ secrets.JOBREC_DOMAIN }}/
                 # frontend setup
                 sudo dnf install nodejs
                 cd /opt/jobrec/tmp
