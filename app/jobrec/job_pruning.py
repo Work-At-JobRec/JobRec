@@ -8,7 +8,9 @@ Pruning works in two steps so that it never deletes on a guess:
    Listings the latest scrape did report are known to be open and are not touched.
 2. Confirm. Each candidate's application link is followed (see link_check.py).
    Only a listing whose link positively shows it is closed is removed. A failed
-   or blocked request leaves the listing in place and is logged.
+   or blocked request leaves the listing in place and is logged. Greenhouse
+   listings whose board is in the source registry are asked about through the
+   board API first, because some careers pages never answer automated requests.
 
 Being absent from a scrape is never enough on its own: some scrapers fetch only
 part of a large board, so an absent listing may well still be open.
@@ -19,7 +21,8 @@ import random
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Optional
+from pathlib import Path
+from typing import Callable, Iterable, Optional
 from urllib.parse import urlsplit
 
 import requests
@@ -28,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from jobrec.db import Base
 from jobrec.job_store import JobListingTable, _to_db
-from jobrec.link_check import LinkStatus, check_link
+from jobrec.link_check import LinkStatus, check_job_link
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +90,29 @@ def find_prune_candidates(
         return [PruneCandidate(*row) for row in session.execute(query)]
 
 
+def greenhouse_boards(registries: Optional[Iterable[Path]] = None) -> dict[str, str]:
+    """Greenhouse board tokens from the source registries, keyed by lower-cased company name.
+
+    Reads the checked-in registry and the demo registry by default; a registry that does
+    not exist is skipped. A Greenhouse entry without a company name is keyed by its token,
+    which is what the scraper stores as the company name in that case.
+    """
+    # Imported here: job_sources pulls in every scraper, which pruning does not otherwise need.
+    from jobrec.job_sources import DEFAULT_SOURCES_PATH, load_sources
+
+    if registries is None:
+        registries = [DEFAULT_SOURCES_PATH, DEFAULT_SOURCES_PATH.with_name("job_sources_demo.json")]
+    boards: dict[str, str] = {}
+    for registry in registries:
+        registry = Path(registry)
+        if not registry.exists():
+            continue
+        for source in load_sources(registry):
+            if source.scraper == "greenhouse":
+                boards[(source.company_name or source.id).strip().lower()] = source.id
+    return boards
+
+
 def delete_listings(engine: Engine, listing_ids: list[int]) -> int:
     """Delete listings by id, first removing rows in other tables that refer to them. Returns the number deleted."""
     if not listing_ids:
@@ -115,14 +141,19 @@ def prune_closed_listings(
     sleep: Callable[[float], None] = time.sleep,
     pause: float = DEFAULT_PAUSE,
     rng: Optional[random.Random] = None,
+    board_tokens: Optional[dict[str, str]] = None,
 ) -> PruneResult:
     """Check candidate listings' links and remove the ones that are closed.
 
     With ``dry_run`` (the default) nothing is deleted and the result reports what would be.
     ``limit`` caps how many links are followed; candidates are shuffled first so repeated
-    limited runs do not keep checking the same ones.
+    limited runs do not keep checking the same ones. ``board_tokens`` maps company names to
+    Greenhouse board tokens (the registries' by default) so those listings can be checked
+    through the board API instead of a careers page that may never answer.
     """
     session = session or requests.Session()
+    if board_tokens is None:
+        board_tokens = greenhouse_boards()
     candidates = find_prune_candidates(engine, now=now, stale_after=stale_after)
     if limit is not None:
         (rng or random.Random()).shuffle(candidates)
@@ -141,7 +172,8 @@ def prune_closed_listings(
         if checked_by_host.get(host):
             sleep(pause)
 
-        link = check_link(candidate.application_url, session, job_id=candidate.source_job_id)
+        board_token = board_tokens.get(candidate.company_name.strip().lower()) if candidate.source == "greenhouse" else None
+        link = check_job_link(candidate.application_url, session, job_id=candidate.source_job_id, board_token=board_token)
         result.checked += 1
         checked_by_host[host] = checked_by_host.get(host, 0) + 1
 

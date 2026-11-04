@@ -25,8 +25,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 
 from jobrec.db import Base
+from jobrec.job_pruning import greenhouse_boards
 from jobrec.job_store import JobListingTable
-from jobrec.link_check import LinkStatus, check_link
+from jobrec.link_check import LinkStatus, check_job_link
 
 DEFAULT_SAMPLE_SIZE = 100
 DEFAULT_PAUSE = 0.5
@@ -56,23 +57,34 @@ def check_stored_links(
     sleep: Callable[[float], None] = time.sleep,
     pause: float = DEFAULT_PAUSE,
     rng: Optional[random.Random] = None,
+    board_tokens: Optional[dict[str, str]] = None,
 ) -> LinkReport:
-    """Follow a random sample of stored application links and report how many are valid."""
+    """Follow a random sample of stored application links and report how many are valid.
+
+    Greenhouse listings whose board is known (``board_tokens``, the registries' by default)
+    are confirmed through the board API, so a careers page that never answers automated
+    requests does not count against the links (#103).
+    """
     session = session or requests.Session()
+    if board_tokens is None:
+        board_tokens = greenhouse_boards()
     table = JobListingTable.__table__
     with Session(engine) as db:
-        rows = list(db.execute(select(table.c.title, table.c.company_name, table.c.application_url).order_by(table.c.id)))
+        rows = list(db.execute(select(
+            table.c.title, table.c.company_name, table.c.application_url, table.c.source, table.c.source_job_id,
+        ).order_by(table.c.id)))
     rows = (rng or random.Random()).sample(rows, min(sample_size, len(rows)))
 
     report = LinkReport()
     seen_hosts: set[str] = set()
-    for title, company, url in rows:
+    for title, company, url, source, job_id in rows:
         host = (urlsplit(url).hostname or "").lower()
         if host in seen_hosts:
             sleep(pause)
         seen_hosts.add(host)
 
-        link = check_link(url, session)
+        board_token = board_tokens.get(company.strip().lower()) if source == "greenhouse" else None
+        link = check_job_link(url, session, job_id=job_id, board_token=board_token)
         report.sampled += 1
         if link.http_status != 200 or link.status is LinkStatus.CLOSED:
             report.problems.append((url, link.reason))

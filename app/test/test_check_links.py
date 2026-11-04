@@ -11,6 +11,7 @@ SRC_DIR = os.path.abspath(
 sys.path.insert(0, SRC_DIR)
 
 from jobrec.check_links import check_stored_links  # noqa: E402
+from jobrec.link_check import GREENHOUSE_JOB_URL  # noqa: E402
 from jobrec.job_listing import JobListing  # noqa: E402
 from jobrec.job_store import upsert_listings  # noqa: E402
 from link_fakes import FakeSession, page  # noqa: E402
@@ -84,3 +85,20 @@ def test_empty_database_gives_an_empty_report(engine):
 
     assert report.sampled == 0
     assert report.resolved_share == 0.0 and report.matched_share == 0.0
+
+
+# --- #103: a Greenhouse job whose careers page never answers still counts as a valid link when the board API confirms it ---
+def test_greenhouse_link_is_confirmed_through_the_api_when_the_page_times_out(engine):
+    upsert_listings(engine, [JobListing(title="Software Engineer", company_name="Roblox", source="greenhouse",
+                                        application_url="https://careers.roblox.com/jobs/7100?gh_jid=7100", source_job_id="7100")])
+    api_url = GREENHOUSE_JOB_URL.format(board_token="roblox", job_id="7100")
+    session = FakeSession({
+        "https://careers.roblox.com/jobs/7100?gh_jid=7100": requests.Timeout("Read timed out"),
+        api_url: page(200, '{"id": 7100, "title": "Software Engineer"}'),
+    })
+
+    report = check_stored_links(engine, session, sleep=no_sleep, board_tokens={"roblox": "roblox"})
+
+    assert (report.sampled, report.resolved, report.matched) == (1, 1, 1)
+    assert report.problems == []
+    assert session.calls == [api_url]

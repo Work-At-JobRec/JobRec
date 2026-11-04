@@ -1,7 +1,9 @@
 import io
 import os
 import sys
-from unittest.mock import patch
+
+import pytest
+from unittest.mock import MagicMock, patch
 from functools import wraps
 from jobrec.app import app
 from sqlalchemy import delete
@@ -154,9 +156,9 @@ def test_valid_pdf_upload_is_saved(tmp_path):
                 headers=fake_headers,
             )
 
-    uploaded_file = tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+    saved = list(tmp_path.iterdir())
 
-    assert uploaded_file.exists()
+    assert len(saved) == 1 and saved[0].suffix == ".pdf"
     assert response.status_code == 200
 
 
@@ -190,9 +192,9 @@ def test_valid_docx_upload_is_saved(tmp_path):
                 headers=fake_headers,
             )
 
-    uploaded_file = tmp_path / "Jane_Smith_-_Public_Resume_Spring_2026-1.docx"
+    saved = list(tmp_path.iterdir())
 
-    assert uploaded_file.exists()
+    assert len(saved) == 1 and saved[0].suffix == ".docx"
     assert response.status_code == 200
 
 
@@ -368,3 +370,201 @@ def test_api_returns_correct_personals(tmp_path):
         assert data.email == dummy_user_personal.email
         assert data.name == dummy_user_personal.name
         assert data.phone == dummy_user_personal.phone
+
+
+# --- #116: uploads are stored under a per-user random name, never the name the browser sent ---
+
+RESUME_PDF = os.path.join(
+    os.path.dirname(__file__), "test_resumes", "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+)
+
+
+def post_resume(client, browser_name="resume.pdf"):
+    with open(RESUME_PDF, "rb") as resume_file, patch("jobrec.app.Thread") as thread:
+        response = client.post(
+            "/upload",
+            data={"resume": (resume_file, browser_name)},
+            content_type="multipart/form-data",
+            headers=fake_headers,
+        )
+    return response, thread
+
+
+# The stored name is derived from the user and a random token, with the extension the browser sent
+def test_upload_filename_is_per_user_random_and_keeps_the_extension():
+    from jobrec.app import upload_filename
+
+    first = upload_filename("auth0|alice", "My Resume (final).PDF")
+    second = upload_filename("auth0|alice", "My Resume (final).PDF")
+    other = upload_filename("auth0|bob", "My Resume (final).PDF")
+
+    assert first.endswith(".pdf") and second.endswith(".pdf")
+    assert first != second
+    assert first.split("-")[0] == second.split("-")[0]
+    assert first.split("-")[0] != other.split("-")[0]
+    assert "My" not in first and "(" not in first and "/" not in first and "\\" not in first
+
+
+# The file on disk does not carry the browser's filename, and the parse thread gets the stored path
+@ignore_auth
+def test_upload_is_stored_under_a_random_name_not_the_browsers(tmp_path):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    client = app.test_client()
+
+    response, thread = post_resume(client, "Jane_Smith_Resume.pdf")
+
+    assert response.status_code == 200
+    saved = list(tmp_path.iterdir())
+    assert len(saved) == 1
+    assert saved[0].name != "Jane_Smith_Resume.pdf"
+    assert saved[0].suffix == ".pdf"
+    assert thread.call_args.kwargs["args"][2] == str(saved[0])
+
+
+# Two users who both upload "resume.pdf" get two files; neither overwrites the other
+def test_two_users_uploading_the_same_filename_get_separate_files(tmp_path):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    client = app.test_client()
+
+    with patch("jobrec.auth.api_client.verify_access_token", new=mock_verify_access_token):
+        with patch("jobrec.app.get_user_id", return_value="auth0|alice"):
+            first, _ = post_resume(client, "resume.pdf")
+        with patch("jobrec.app.get_user_id", return_value="auth0|bob"):
+            second, _ = post_resume(client, "resume.pdf")
+
+    assert first.status_code == 200 and second.status_code == 200
+    saved = sorted(p.name for p in tmp_path.iterdir())
+    assert len(saved) == 2
+    assert "resume.pdf" not in saved
+    assert saved[0].split("-")[0] != saved[1].split("-")[0]
+
+
+# --- #117: the upload route does not print the request to the function log ---
+
+@ignore_auth
+def test_upload_does_not_print_the_request(tmp_path, capsys):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    client = app.test_client()
+
+    post_resume(client, "Jane_Smith_Resume.pdf")
+
+    captured = capsys.readouterr()
+    assert "Jane_Smith_Resume.pdf" not in captured.out
+    assert "ImmutableMultiDict" not in captured.out
+
+
+# --- #115: the uploaded resume is deleted once parsing has finished, and so is the copy sent to OpenAI ---
+
+
+def make_user_info(**fields):
+    return UserInfo(
+        skills=[], education=[], projects=[], socials=[], employment_history=[], **fields
+    )
+
+
+def make_profile_engine(tmp_path):
+    engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'profile.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(UserInfoTable(user_id=mock_user, info={}, done_processing=False))
+        session.commit()
+    return engine
+
+
+def stored_profile(engine):
+    with Session(engine) as session:
+        return session.scalars(
+            select(UserInfoTable).where(UserInfoTable.user_id == mock_user)
+        ).one()
+
+
+# The parse thread removes the resume from disk after the profile has been written
+def test_update_skill_db_deletes_the_resume_after_a_successful_parse(tmp_path):
+    engine = make_profile_engine(tmp_path)
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4 fake")
+
+    with patch("jobrec.openaiapi.parse_resume", return_value=make_user_info(name="Jane")):
+        update_skill_db(mock_user, engine, str(resume))
+
+    assert not resume.exists()
+    profile = stored_profile(engine)
+    assert profile.done_processing and profile.info["name"] == "Jane"
+
+
+# A failed parse still removes the resume and still marks the profile as processed
+def test_update_skill_db_deletes_the_resume_when_parsing_fails(tmp_path):
+    engine = make_profile_engine(tmp_path)
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4 fake")
+
+    with patch("jobrec.openaiapi.parse_resume", side_effect=RuntimeError("model down")):
+        update_skill_db(mock_user, engine, str(resume))
+
+    assert not resume.exists()
+    assert stored_profile(engine).done_processing
+
+
+def fake_openai_client(parsed):
+    client = MagicMock()
+    client.files.create.return_value.id = "file-123"
+    if isinstance(parsed, Exception):
+        client.responses.parse.side_effect = parsed
+    else:
+        client.responses.parse.return_value.output_parsed = parsed
+    return client
+
+
+# The file uploaded to OpenAI is deleted once the model has answered, and the local handle is closed
+def test_parse_resume_deletes_the_openai_copy(tmp_path):
+    from jobrec.openaiapi import parse_resume
+
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4 fake")
+    client = fake_openai_client(make_user_info(name="Jane"))
+
+    with patch("jobrec.openaiapi.client", client), patch(
+        "jobrec.openaiapi.extract_resume_text", return_value=""
+    ):
+        result = parse_resume(str(resume))
+
+    assert result.name == "Jane"
+    client.files.delete.assert_called_once_with("file-123")
+    resume.unlink()  # fails on Windows if parse_resume left the file open
+
+
+# The OpenAI copy is deleted even when the model call raises
+def test_parse_resume_deletes_the_openai_copy_when_the_model_call_fails(tmp_path):
+    from jobrec.openaiapi import parse_resume
+
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4 fake")
+    client = fake_openai_client(RuntimeError("model down"))
+
+    with patch("jobrec.openaiapi.client", client), pytest.raises(RuntimeError):
+        parse_resume(str(resume))
+
+    client.files.delete.assert_called_once_with("file-123")
+    resume.unlink()
+
+
+# End to end: after the upload route and its parse thread have run, the uploads folder is empty
+@ignore_auth
+def test_upload_leaves_no_file_behind_once_the_parse_thread_has_run(tmp_path):
+    app.config["TESTING"] = True
+    app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    client = app.test_client()
+
+    response, thread = post_resume(client)
+    assert response.status_code == 200
+    assert len(list(tmp_path.iterdir())) == 1
+
+    target = thread.call_args.kwargs["target"]
+    args = thread.call_args.kwargs["args"]
+    with patch("jobrec.openaiapi.parse_resume", return_value=make_user_info()):
+        target(*args)
+
+    assert list(tmp_path.iterdir()) == []

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth0 } from "@auth0/auth0-react";
+import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser";
+import Navbar from "../components/Navbar";
 
 const fields = [
   { name: "name", label: "Name", type: "text" },
@@ -10,130 +11,76 @@ const fields = [
 ];
 
 export default function Onboarding() {
-  const {
-    isAuthenticated,
-    isLoading,
-    getAccessTokenSilently,
-    loginWithRedirect,
-  } = useAuth0();
-
-  const navigate = useNavigate();
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (submitting) return;
-
-    setError("");
-
-    if (!isAuthenticated) {
-      setError("You must be logged in to save your profile.");
-      return;
-    }
-
-    // Read form data before awaiting anything.
-    const formData = new FormData(e.currentTarget);
-    setSubmitting(true);
-
-    try {
-      // Obtain a valid token for this request.
-      const token = await getAccessTokenSilently();
-
-      if (!token) {
-        throw new Error("Could not obtain an authentication token.");
+      const { isAuthenticated, isLoading,  getAccessTokenSilently} = useAuthenticatedUser();
+      const [formData, setFormData] = useState(null);
+      const navigate = useNavigate();
+      function handleSubmit(e){
+        // Prevent the browser from reloading the page
+        e.preventDefault();
+        // Read the form data
+        const form = e.target;
+        const data = new FormData(form);
+        setFormData(data);
       }
 
-      const res = await fetch("/api/onboarding", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error(
-            "Your session could not be verified. Please log in again."
-          );
+      useEffect(() => {async function send_data() {
+         if(formData && isAuthenticated && !isLoading){
+            try { 
+              const accessToken = await getAccessTokenSilently();
+            const res = await fetch("/api/onboarding", {headers: {
+                Authorization: `Bearer ${accessToken}`
+                }, body: formData,
+                   method: 'POST'});
+            if(res.status != 200){
+                console.error(`attempt to submit onboarding results got response ${res.status}`)
+            } else {
+                navigate("/profile");
+            }
+        } catch (err) {
+            console.error("Failed to submit onboarding results", err);
+            }
         }
-
-        throw new Error(
-          `Could not save your profile (HTTP ${res.status}).`
-        );
+        
       }
+      send_data();
+       
+      }, [isAuthenticated, isLoading, formData]);
+      
+      const label = "block mb-2 text-left text-[17px] font-bold text-black";
+      const input = "w-full border-[1.5px] border-black rounded-full px-4 py-2 bg-transparent text-black outline-none focus:border-[#ff2d8d]";
 
-      // Success: return to the profile without reloading.
-      navigate("/profile", { replace: true });
+      return (
+        <div className="flex flex-col items-center min-h-screen text-center">
+          <Navbar />
+          <div className="text-[96px] font-bold text-black mt-20 mb-5">Welcome, new user</div>
+          <div className="text-[22px] text-black text-center mb-[30px]">Complete your profile:</div>
 
-    } catch (err) {
-      console.error("Onboarding submission failed:", err);
-      setError(
-        err.message || "Something went wrong. Please try again."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col items-center min-h-screen pt-20 text-center">
-      <h1 className="text-[96px] font-bold text-black mt-20 mb-5">
-        Welcome, new user
-      </h1>
-
-      <p className="text-[22px] text-black text-center">
-        Complete your profile:
-      </p>
-
-      {isLoading && <p>Checking your login...</p>}
-
-      {!isLoading && !isAuthenticated && (
-        <div>
-          <p>Your login session is unavailable.</p>
-          <button type="button" onClick={() => loginWithRedirect()}>
-            Log in again
-          </button>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <div className="grid gap-6 mb-6 md:grid-cols-2">
-          {fields.map((field) => (
-            <div key={field.name}>
-              <label
-                htmlFor={field.name}
-                className="block mb-2.5 text-sm font-medium"
-              >
-                {field.label}
-              </label>
-
-              <input
-                type={field.type}
-                id={field.name}
-                name={field.name}
-                className="bg-neutral-secondary-medium border border-default-medium text-sm rounded-base block w-full px-3 py-2.5 shadow-xs text-body"
-                required
-              />
+          <form onSubmit={handleSubmit} className="w-full max-w-[640px] px-4">
+            <div className="grid gap-6 mb-8 md:grid-cols-2">
+                <div>
+                    <label htmlFor="name" className={label}>Name</label>
+                    <input type="text" id="name" name="name" className={input} required />
+                </div>
+                <div>
+                    <label htmlFor="email" className={label}>Email</label>
+                    <input type="email" id="email" name="email" className={input} required />
+                </div>
+                <div>
+                    <label htmlFor="phone" className={label}>Phone Number</label>
+                    <input type="tel" id="phone" name="phone" className={input} required />
+                </div>
+                <div>
+                    <label htmlFor="address" className={label}>Address</label>
+                    <input type="text" id="address" name="address" className={input} required />
+                </div>
             </div>
-          ))}
+            <button
+              type="submit"
+              className="rounded-xl border border-[#ff2d8d] bg-transparent px-8 py-2 text-[17px] font-semibold text-[#ff2d8d] transition-colors hover:bg-[#ff2d8d] hover:text-white cursor-pointer"
+            >
+              Submit
+            </button>
+          </form>
         </div>
-
-        {error && (
-          <p role="alert" className="text-red-600 mb-4">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={submitting || isLoading || !isAuthenticated}
-          className="text-black bg-brand box-border border disabled:opacity-50"
-        >
-          {submitting ? "Saving..." : "Submit"}
-        </button>
-      </form>
-    </div>
-  );
-}
+      );
+    }

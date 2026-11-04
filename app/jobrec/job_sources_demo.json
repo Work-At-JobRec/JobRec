@@ -21,6 +21,7 @@
     {"scraper": "ashby", "id": "notion", "company_name": "Notion", "enabled": true},
     {"scraper": "ashby", "id": "cursor", "company_name": "Cursor", "enabled": true},
     {"scraper": "ashby", "id": "perplexity", "company_name": "Perplexity", "enabled": true},
-    {"scraper": "ashby", "id": "replit", "company_name": "Replit", "enabled": true}
+    {"scraper": "ashby", "id": "replit", "company_name": "Replit", "enabled": true},
+    {"scraper": "llm", "id": "https://www.python.org/jobs/", "company_name": "Python.org jobs board", "enabled": false}
   ]
 }
