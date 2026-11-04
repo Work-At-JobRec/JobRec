@@ -6,6 +6,11 @@ body {
   margin: 0;
 }
 
+/* Matches one Safari "zoom out" step (85%); applied to page content below the navbar */
+.page-zoom {
+  zoom: 0.85;
+}
+
 .avatar::before {
   content: "";
   position: absolute;
@@ -37,6 +42,18 @@ body {
 @keyframes spin {
   100% {
     transform: rotate(360deg);
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
