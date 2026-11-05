@@ -7,7 +7,7 @@ User=ec2-user
 Group=ec2-user
 WorkingDirectory=/opt/jobrec/app
 Environment="DEPLOYMENT=True"
-ExecStart=/home/ec2-user/.local/bin/poetry run jobrec.listing_skill_extractor --limit 50
+ExecStart=/home/ec2-user/.local/bin/poetry run python -m jobrec.listing_skill_extractor --limit 50
 
 [Install]
 WantedBy=multi-user.target

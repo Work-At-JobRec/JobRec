@@ -84,6 +84,7 @@ jobs:
                 npm install
                 chmod +x node_modules/.bin/vite
                 npx vite build
+                sudo chmod 755 -R /opt/jobrec
                 # enable all services
                 sudo systemctl daemon-reload
                 sudo systemctl enable --now nginx.service
