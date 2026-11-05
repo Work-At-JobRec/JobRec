@@ -265,6 +265,7 @@ def _profile_skills(session: Session, user_id: str) -> dict[str, int]:
     return skills
 
 
+
 def _ranked_jobs(
     engine: Engine,
     user_id: str,
@@ -280,32 +281,50 @@ def _ranked_jobs(
                 .order_by(JobListingTable.id)
             )
         )
+
         if not listing_rows:
             return []
 
         listing_ids = [row.id for row in listing_rows]
-        skill_rows = session.execute(
-            select(
-                ListingSkillTable.listing_id,
-                CanonicalSkillTable.skill_name,
-                ListingSkillTable.proficiency_level,
+
+        # Retrieve job skills in batches to avoid SQLite's
+        # maximum number of SQL variables per query.
+        BATCH_SIZE = 500
+        skill_rows = []
+
+        for i in range(0, len(listing_ids), BATCH_SIZE):
+            batch_ids = listing_ids[i:i + BATCH_SIZE]
+
+            batch_rows = session.execute(
+                select(
+                    ListingSkillTable.listing_id,
+                    CanonicalSkillTable.skill_name,
+                    ListingSkillTable.proficiency_level,
+                )
+                .join(
+                    CanonicalSkillTable,
+                    CanonicalSkillTable.id == ListingSkillTable.skill_id,
+                )
+                .where(ListingSkillTable.listing_id.in_(batch_ids))
             )
-            .join(
-                CanonicalSkillTable,
-                CanonicalSkillTable.id == ListingSkillTable.skill_id,
-            )
-            .where(ListingSkillTable.listing_id.in_(listing_ids))
-        )
+
+            skill_rows.extend(batch_rows)
+
         requirements_by_listing: dict[int, list[tuple[str, int]]] = {}
+
         for listing_id, skill_name, proficiency in skill_rows:
             requirements_by_listing.setdefault(listing_id, []).append(
                 (skill_name, proficiency)
             )
 
+
         location_query = (location or "").split(",", 1)[0].strip().casefold()
         ranked: list[tuple[float, int, dict[str, object]]] = []
+
         for row in listing_rows:
+
             listing = to_job_listing(row)
+
             if (
                 location_query
                 and location_query not in (listing.location or "").casefold()
@@ -313,15 +332,19 @@ def _ranked_jobs(
                 continue
 
             requirements = requirements_by_listing.get(row.id, [])
+
             denominator = sum(required / 4 for _, required in requirements)
+
             numerator = sum(
                 (required / 4)
                 * (applicant_skills.get(_normalized_skill_name(name), 0) / 4)
                 for name, required in requirements
             )
+
             compatibility = numerator / denominator if denominator else 0.0
             salary_score = _salary_score(listing.pay, desired_salary)
             search_index = 0.7 * compatibility + 0.3 * salary_score
+
             displayed_requirements = [
                 {
                     "text": f"Requires proficiency level {required}/4",
@@ -331,11 +354,13 @@ def _ranked_jobs(
                 }
                 for name, required in requirements
             ]
+
             job = to_api_job(listing)
             job["id"] = f"{listing.source}-{listing.source_job_id or row.id}"
             job["salary"] = listing.pay
             job["compatibility"] = round(compatibility * 100)
             job["requirements"] = displayed_requirements
+
             ranked.append((search_index, row.id, job))
 
         ranked.sort(key=lambda item: (-item[0], item[1]))
