@@ -1,5 +1,5 @@
 [Unit]
-Description=Scrape jobs from the internet and store them
+Description=Run the JobRec Backend
 After=network.target
 
 [Service]
@@ -7,7 +7,7 @@ User=ec2-user
 Group=ec2-user
 WorkingDirectory=/opt/jobrec/app
 Environment="DEPLOYMENT=True"
-ExecStart=/home/ec2-user/.local/bin/poetry run jobrec.scrape_all
+ExecStart=/home/ec2-user/.local/bin/poetry run jobrec.app
 
 [Install]
 WantedBy=multi-user.target
