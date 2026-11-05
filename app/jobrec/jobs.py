@@ -322,9 +322,6 @@ def _ranked_jobs(
         ranked: list[tuple[float, int, dict[str, object]]] = []
 
         for row in listing_rows:
-            # Skip jobs that have not had their skills extracted yet.
-            if row.id not in requirements_by_listing:
-                continue
 
             listing = to_job_listing(row)
 
@@ -345,8 +342,8 @@ def _ranked_jobs(
             )
 
             compatibility = numerator / denominator if denominator else 0.0
-            salary_score = min(_salary_score(listing.pay, desired_salary), 1.0)
-            search_index = 0.9 * compatibility + 0.1 * salary_score
+            salary_score = _salary_score(listing.pay, desired_salary)
+            search_index = 0.7 * compatibility + 0.3 * salary_score
 
             displayed_requirements = [
                 {
