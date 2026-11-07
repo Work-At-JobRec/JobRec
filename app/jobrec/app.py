@@ -36,11 +36,6 @@ from dotenv import load_dotenv
 import jobrec.auth as auth
 from jobrec.jobs import MAX_JOB_RESULTS, MAX_PAGE_SIZE, get_jobs, get_job
 from jobrec.auth import require_auth, get_user_id
-from jobrec.listing_search.find_listings import (
-    find_percentile,
-    find_skill_gaps,
-    get_job_recommendations,
-)
 import importlib
 import logging
 
@@ -351,7 +346,7 @@ def jobs_api():
     end_time = time.perf_counter_ns()
     listing_count = count_finalized_listings(engine)
     print(
-        f"ranking {listing_count} jobs took {(end_time - start_time) / 1000000000} seconds"
+        f"ranking {listing_count} jobs took {(end_time - start_time) / 10 ** 9} seconds"
     )
     return jsonify(res)
 

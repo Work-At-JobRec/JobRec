@@ -5,6 +5,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from os import environ as env
+import time
 
 from dotenv import load_dotenv
 from sqlalchemy import Engine, func, select
@@ -60,6 +61,7 @@ def extract_pending_listing_skills(
 
     result = ExtractionResult()
     for dedupe_key, description in pending:
+        start_time = time.perf_counter_ns()
         try:
             catalog = get_skill_catalog(engine)
             matched, discovered = detect_document_skills(
@@ -79,6 +81,10 @@ def extract_pending_listing_skills(
             result.processed += 1
         else:
             result.stale += 1
+        end_time = time.perf_counter_ns()
+        logger.info(
+            f"skill extraction took {(end_time - start_time) / 10 ** 9} seconds"
+        )
 
     with Session(engine) as session:
         result.pending = (
