@@ -15,6 +15,9 @@ If you want to try your hand at self-hosting this app, you will need to first ge
 2. Log in or create an account
 3. Upload your resume and start using the site
 
+# Documentation
+- [Reference](doc/reference.md): system structure, APIs, configuration, database schemas, job sources, and listing pruning
+
 # Contributors
 - Luna Brown
 - Luke McCartney
