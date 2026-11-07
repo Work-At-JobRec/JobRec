@@ -1,6 +1,7 @@
 import os
 import math
 from os import environ as env
+import time
 from urllib.parse import urlparse
 from flask import (
     Flask,
@@ -22,6 +23,8 @@ from jobrec.openaiapi import (
 )
 from jobrec.job_store import (
     JobListingTable,
+    count_finalized_listings,
+    count_listings,
     ensure_job_listing_schema,
 )
 from threading import Thread
@@ -31,7 +34,7 @@ from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
 import jobrec.auth as auth
-from jobrec.jobs import get_jobs, get_job
+from jobrec.jobs import MAX_JOB_RESULTS, MAX_PAGE_SIZE, get_jobs, get_job
 from jobrec.auth import require_auth, get_user_id
 from jobrec.listing_search.find_listings import (
     find_percentile,
@@ -39,10 +42,14 @@ from jobrec.listing_search.find_listings import (
     get_job_recommendations,
 )
 import importlib
+import logging
 
 from jobrec.job_sources import load_sources, scrape_all
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename="jobrec_backend.log", level=logging.INFO)
 
 
 RESUME_FOLDER = env.get("RESUME_FOLDER", "uploads")
@@ -211,15 +218,14 @@ def complete_onboarding():
         session.commit()
     return Response(status=200)
 
+
 @app.route("/api/onboarding/skip", methods=["POST"])
 @require_auth
 def skip_onboarding():
     user_id = get_user_id()
 
     with Session(engine) as session:
-        stmt = select(UserInfoTable).where(
-            UserInfoTable.user_id == user_id
-        )
+        stmt = select(UserInfoTable).where(UserInfoTable.user_id == user_id)
 
         existing_user = session.scalars(stmt).one_or_none()
 
@@ -246,6 +252,7 @@ def skip_onboarding():
             session.commit()
 
     return Response(status=200)
+
 
 # new home page
 @app.route("/")
@@ -310,6 +317,7 @@ def allowed_file(filename):
 @app.route("/api/jobs")
 @require_auth
 def jobs_api():
+
     salary_parameter = request.args.get("desired_salary")
     desired_salary: float | None = None
     if salary_parameter is not None:
@@ -319,14 +327,33 @@ def jobs_api():
             return jsonify(error="desired_salary must be a positive annual amount"), 400
         if not math.isfinite(desired_salary) or desired_salary <= 0:
             return jsonify(error="desired_salary must be a positive annual amount"), 400
-    return jsonify(
-        get_jobs(
-            engine,
-            get_user_id(),
-            desired_salary,
-            request.args.get("location"),
+    try:
+        page = int(request.args.get("page", "1"))
+        page_size = int(request.args.get("page_size", str(MAX_JOB_RESULTS)))
+    except ValueError:
+        return jsonify(error="page and page_size must be positive integers"), 400
+    if page < 1:
+        return jsonify(error="page must be at least 1"), 400
+    if page_size < 1 or page_size > MAX_PAGE_SIZE:
+        return (
+            jsonify(error=f"page_size must be between 1 and {MAX_PAGE_SIZE}"),
+            400,
         )
+    start_time = time.perf_counter_ns()
+    res = get_jobs(
+        engine,
+        get_user_id(),
+        desired_salary,
+        request.args.get("location"),
+        page=page,
+        page_size=page_size,
     )
+    end_time = time.perf_counter_ns()
+    listing_count = count_finalized_listings(engine)
+    print(
+        f"ranking {listing_count} jobs took {(end_time - start_time) / 1000000000} seconds"
+    )
+    return jsonify(res)
 
 
 @app.route("/api/jobs/<job_id>")
@@ -428,7 +455,7 @@ def upload_file():
             session.commit()
             p = Thread(target=update_skill_db, args=[user_id, engine, filepath])
             p.start()
-            print("finished scheduling process")
+            logger.info("finished scheduling process")
             # change made so when resumes upload it goes to the profile
             # instead of default title page
             return Response(status=200)
