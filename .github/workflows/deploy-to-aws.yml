@@ -91,6 +91,7 @@ jobs:
                 sudo nginx -s reload
                 sudo systemctl enable --now jobrec.service
                 sudo systemctl restart jobrec.service
+                sudo systemctl enable --now prune-jobs.timer
                 ENDSSH
                 # cleanup
                 rm *.pem
