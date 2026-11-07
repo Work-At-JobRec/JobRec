@@ -135,7 +135,7 @@ def _fit_key(key: str) -> str:
     if max_length is None or len(key) <= max_length:
         return key
     digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
-    return key[:max_length - len(digest) - 1] + "#" + digest
+    return key[: max_length - len(digest) - 1] + "#" + digest
 
 
 def id_key(source: str, job_id: str) -> str:
@@ -158,7 +158,9 @@ def listing_key(listing: JobListing) -> str:
     url = normalize_url(listing.application_url)
     if url:
         return _fit_key(f"{source}:url:{url}")
-    fields = "|".join(_squash(v) for v in (listing.company_name, listing.title, listing.location))
+    fields = "|".join(
+        _squash(v) for v in (listing.company_name, listing.title, listing.location)
+    )
     return _fit_key(f"{source}:fields:{fields}")
 
 
@@ -248,16 +250,23 @@ def upsert_listings(
     except IntegrityError:
         # Another run stored one of these new listings between our lookup and our insert.
         # Looking again finds it as existing, so a single retry settles it.
-        logger.warning("Concurrent insert detected while storing job listings; retrying once")
+        logger.warning(
+            "Concurrent insert detected while storing job listings; retrying once"
+        )
         result = _upsert_once(engine, by_key, now)
 
     logger.info(
-        "Stored job listings: %d inserted, %d updated, %d unchanged", result.inserted, result.updated, result.unchanged,
+        "Stored job listings: %d inserted, %d updated, %d unchanged",
+        result.inserted,
+        result.updated,
+        result.unchanged,
     )
     return result
 
 
-def _upsert_once(engine: Engine, by_key: dict[str, JobListing], now: datetime) -> UpsertResult:
+def _upsert_once(
+    engine: Engine, by_key: dict[str, JobListing], now: datetime
+) -> UpsertResult:
     """Insert or update every listing in one transaction."""
     result = UpsertResult()
     keys = list(by_key)
@@ -274,14 +283,19 @@ def _upsert_once(engine: Engine, by_key: dict[str, JobListing], now: datetime) -
             row = existing.get(key)
             if row is None:
                 row = JobListingTable(
-                    dedupe_key=key, source=_text_for_db(listing.source, "source"), first_seen_at=now, updated_at=now,
+                    dedupe_key=key,
+                    source=_text_for_db(listing.source, "source"),
+                    first_seen_at=now,
+                    updated_at=now,
                     skills_pending=True,
                 )
                 _apply_changes(row, listing)
                 session.add(row)
                 result.inserted += 1
             else:
-                description_changed = row.description != _value_for_db(listing, "description")
+                description_changed = row.description != _value_for_db(
+                    listing, "description"
+                )
                 if _apply_changes(row, listing):
                     row.updated_at = now
                     result.updated += 1
@@ -309,8 +323,23 @@ def count_listings(engine: Engine) -> int:
         return session.scalar(select(func.count()).select_from(JobListingTable)) or 0
 
 
+def count_finalized_listings(engine: Engine) -> int:
+    with Session(engine) as session:
+        return (
+            session.scalar(
+                select(func.count())
+                .select_from(JobListingTable)
+                .where(JobListingTable.skills_pending == False)
+            )
+            or 0
+        )
+
+
 def list_recent_listings(
-    engine: Engine, limit: int, description_chars: Optional[int] = None
+    engine: Engine,
+    limit: int,
+    description_chars: Optional[int] = None,
+    offset: int = 0,
 ) -> list[JobListing]:
     """Return up to ``limit`` stored listings, most recently posted first.
 
@@ -336,10 +365,38 @@ def list_recent_listings(
             func.coalesce(table.c.posted_at, table.c.first_seen_at).desc(),
             table.c.id.desc(),
         )
+        .offset(offset)
         .limit(limit)
     )
     with Session(engine) as session:
         return [to_job_listing(row) for row in session.execute(query)]
+
+
+def list_listings_by_ids(
+    engine: Engine,
+    listing_ids: list[int],
+    description_chars: Optional[int] = None,
+) -> list[JobListing]:
+    """Fetch only the requested listings, optionally truncating descriptions in SQL."""
+    if not listing_ids:
+        return []
+    table = JobListingTable.__table__
+    description = table.c.description
+    if description_chars is not None:
+        description = func.substr(table.c.description, 1, description_chars).label(
+            "description"
+        )
+    columns = [column for column in table.c if column.name != "description"] + [
+        description
+    ]
+    with Session(engine) as session:
+        rows = session.execute(select(*columns).where(table.c.id.in_(listing_ids)))
+        listings_by_id = {row.id: to_job_listing(row) for row in rows}
+    return [
+        listings_by_id[listing_id]
+        for listing_id in listing_ids
+        if listing_id in listings_by_id
+    ]
 
 
 def get_listing(
