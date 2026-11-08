@@ -32,6 +32,12 @@ from docx import Document
 from dotenv import load_dotenv
 import jobrec.auth as auth
 from jobrec.jobs import get_jobs, get_job
+from jobrec.bookmarks import (
+    add_bookmark,
+    get_bookmarked_jobs,
+    is_bookmarked,
+    remove_bookmark,
+)
 from jobrec.auth import require_auth, get_user_id
 from jobrec.listing_search.find_listings import (
     find_percentile,
@@ -311,6 +317,26 @@ def job_detail_api(job_id: str):
     if job is None:
         return jsonify(error="Job not found"), 404
     return jsonify(job)
+
+
+@app.route("/api/bookmarks")
+@require_auth
+def bookmarks_api():
+    return jsonify(get_bookmarked_jobs(engine, get_user_id()))
+
+
+# GET: whether the job is bookmarked. PUT: bookmark it. DELETE: remove the bookmark.
+@app.route("/api/bookmarks/<job_id>", methods=["GET", "PUT", "DELETE"])
+@require_auth
+def bookmark_api(job_id: str):
+    user_id = get_user_id()
+    if request.method == "PUT":
+        if get_job(job_id, engine, user_id) is None:
+            return jsonify(error="Job not found"), 404
+        add_bookmark(engine, user_id, job_id)
+    elif request.method == "DELETE":
+        remove_bookmark(engine, user_id, job_id)
+    return jsonify(bookmarked=is_bookmarked(engine, user_id, job_id))
 
 
 def allowed_file(filename):

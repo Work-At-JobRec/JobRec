@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
+import JobListLinks from "../components/JobListLinks.jsx";
 import { ChevronDownIcon, FunnelIcon, SearchIcon } from "../components/Icons.jsx";
 import { fetchJobs } from "../api/jobs.js";
 import EmptyJobsState from "../components/EmptyJobsState.jsx";
@@ -190,7 +191,10 @@ export default function Search() {
     <div className="min-h-screen bg-white">
       <Navbar />
       <main className="max-w-[1400px] mx-auto px-6 pb-16">
-        <h1 className="text-center text-[56px] font-bold mt-24 mb-12">Here are the Best Jobs For You:</h1>
+        <h1 className="text-center text-[56px] font-bold mt-24 mb-8">Here are the Best Jobs For You:</h1>
+        <div className="mb-12">
+          <JobListLinks />
+        </div>
 
         <div className="max-w-[1100px] mx-auto">
           <form role="search" onSubmit={(e) => e.preventDefault()} className="flex items-center border-[1.5px] border-black rounded-full px-8 py-2 text-[26px]">

@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar.jsx";
 import EmptyJobsState from "../components/EmptyJobsState.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
+import JobListLinks from "../components/JobListLinks.jsx";
 import { ChevronDownIcon, FunnelIcon } from "../components/Icons.jsx";
 import { fetchJobs } from "../api/jobs.js";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
@@ -36,7 +37,10 @@ export default function Jobs() {
     <div className="min-h-screen bg-white">
       <Navbar />
       <main className="max-w-[1400px] mx-auto px-6 pb-16">
-        <h1 className="text-center text-[56px] font-bold mt-24 mb-16">Here are the Best Jobs For You:</h1>
+        <h1 className="text-center text-[56px] font-bold mt-24 mb-8">Here are the Best Jobs For You:</h1>
+        <div className="mb-12">
+          <JobListLinks />
+        </div>
 
         <div className="max-w-[1000px] mx-auto">
           <LocationBar />

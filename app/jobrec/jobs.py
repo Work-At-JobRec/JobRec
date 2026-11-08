@@ -361,6 +361,11 @@ def get_jobs(
     return _ranked_jobs(engine, user_id, desired_salary, location)[:MAX_JOB_RESULTS]
 
 
+def get_jobs_by_id(engine: Engine, user_id: str) -> dict[str, dict[str, object]]:
+    """Every open job, uncapped, keyed by id and scored for the user."""
+    return {job["id"]: job for job in _ranked_jobs(engine, user_id, None, None)}
+
+
 def get_job(
     id_: str,
     engine: Engine | None = None,

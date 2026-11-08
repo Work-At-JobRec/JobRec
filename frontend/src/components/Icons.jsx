@@ -66,3 +66,12 @@ export function SearchIcon({ className = "w-6 h-6" }) {
     </svg>
   );
 }
+
+export function BookmarkIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <rect x="2" y="1" width="20" height="22" rx="1" fill="white" />
+      <path d="M8 3h8v17l-4-4-4 4V3Z" fill="black" />
+    </svg>
+  );
+}
