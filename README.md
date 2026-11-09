@@ -16,7 +16,7 @@ If you want to try your hand at self-hosting this app, you will need to first ge
 3. Upload your resume and start using the site
 
 # Documentation
-['Tutorial'](https://github.com/Work-At-JobRec/JobRec/edit/main/docs/tutorial.md)
+[Tutorial](https://github.com/Work-At-JobRec/JobRec/blob/main/docs/tutorial.md)
 
 # Contributors
 - Luna Brown
