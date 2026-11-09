@@ -5,6 +5,7 @@ import LocationBar from "../components/LocationBar.jsx";
 import BookmarkButton from "../components/BookmarkButton.jsx";
 import { ClockIcon, DollarIcon, FlagIcon, PinIcon, PushpinIcon } from "../components/Icons.jsx";
 import { compatibilityColor, fetchJob } from "../api/jobs.js";
+import { setSaved } from "../api/savedJobs.js";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 
 function Requirement({ text, skill, met }) {
@@ -45,6 +46,13 @@ export default function JobDetail() {
     }
     fetchJob_wrapper();
   }, [id, isLoading, isAuthenticated]);
+
+  // Apply Now opens the posting in a new tab; also add the job to the user's Applied Jobs.
+  const markApplied = () => {
+    getAccessTokenSilently()
+      .then((token) => setSaved("applied", job.id, true, token))
+      .catch((err) => console.error("Couldn't add the job to Applied Jobs", err));
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -137,6 +145,7 @@ export default function JobDetail() {
                   href={job.applicationUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={markApplied}
                   className="bg-[#E066A3] hover:bg-[#d4508f] text-white text-[28px] font-bold rounded-3xl px-20 py-4 transition-colors no-underline"
                 >
                   Apply Now

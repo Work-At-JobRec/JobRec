@@ -32,11 +32,12 @@ from docx import Document
 from dotenv import load_dotenv
 import jobrec.auth as auth
 from jobrec.jobs import get_jobs, get_job
-from jobrec.bookmarks import (
-    add_bookmark,
-    get_bookmarked_jobs,
-    is_bookmarked,
-    remove_bookmark,
+from jobrec.saved_jobs import (
+    LISTS,
+    get_saved_jobs,
+    is_saved,
+    save_job,
+    unsave_job,
 )
 from jobrec.auth import require_auth, get_user_id
 from jobrec.listing_search.find_listings import (
@@ -319,24 +320,28 @@ def job_detail_api(job_id: str):
     return jsonify(job)
 
 
-@app.route("/api/bookmarks")
+# The user's saved job lists: /api/bookmarks and /api/applied.
+@app.route("/api/<any(" + ", ".join(LISTS) + "):list_name>")
 @require_auth
-def bookmarks_api():
-    return jsonify(get_bookmarked_jobs(engine, get_user_id()))
+def saved_jobs_api(list_name: str):
+    return jsonify(get_saved_jobs(engine, get_user_id(), list_name))
 
 
-# GET: whether the job is bookmarked. PUT: bookmark it. DELETE: remove the bookmark.
-@app.route("/api/bookmarks/<job_id>", methods=["GET", "PUT", "DELETE"])
+# GET: whether the job is on the list. PUT: add it. DELETE: remove it.
+@app.route(
+    "/api/<any(" + ", ".join(LISTS) + "):list_name>/<job_id>",
+    methods=["GET", "PUT", "DELETE"],
+)
 @require_auth
-def bookmark_api(job_id: str):
+def saved_job_api(list_name: str, job_id: str):
     user_id = get_user_id()
     if request.method == "PUT":
         if get_job(job_id, engine, user_id) is None:
             return jsonify(error="Job not found"), 404
-        add_bookmark(engine, user_id, job_id)
+        save_job(engine, user_id, list_name, job_id)
     elif request.method == "DELETE":
-        remove_bookmark(engine, user_id, job_id)
-    return jsonify(bookmarked=is_bookmarked(engine, user_id, job_id))
+        unsave_job(engine, user_id, list_name, job_id)
+    return jsonify(saved=is_saved(engine, user_id, list_name, job_id))
 
 
 def allowed_file(filename):

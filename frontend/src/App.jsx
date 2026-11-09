@@ -5,6 +5,7 @@ import Jobs from "./pages/Jobs.jsx";
 import JobDetail from "./pages/JobDetail.jsx";
 import Search from "./pages/Search.jsx";
 import Bookmarks from "./pages/Bookmarks.jsx";
+import Applied from "./pages/Applied.jsx";
 import Onboarding from "./pages/Onboarding.jsx"
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/jobs/:id" element={<JobDetail />} />
           <Route path="/search" element={<Search />} />
           <Route path="/bookmarks" element={<Bookmarks />} />
+          <Route path="/applied" element={<Applied />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/onboarding" element={<Onboarding />} />
         </Routes>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BookmarkIcon } from "./Icons.jsx";
-import { fetchIsBookmarked, setBookmarked } from "../api/bookmarks.js";
+import { fetchIsSaved, setSaved } from "../api/savedJobs.js";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 
 // Toggles a bookmark on one job. Black until hovered or bookmarked, then pink.
@@ -16,7 +16,7 @@ export default function BookmarkButton({ jobId, className = "" }) {
     let cancelled = false;
     setBookmarkedState(null);
     getAccessTokenSilently()
-      .then((token) => fetchIsBookmarked(jobId, token))
+      .then((token) => fetchIsSaved("bookmarks", jobId, token))
       .then((saved) => !cancelled && setBookmarkedState(saved))
       .catch((err) => {
         console.error(err);
@@ -34,7 +34,7 @@ export default function BookmarkButton({ jobId, className = "" }) {
     setError(null);
     try {
       const token = await getAccessTokenSilently();
-      setBookmarkedState(await setBookmarked(jobId, next, token));
+      setBookmarkedState(await setSaved("bookmarks", jobId, next, token));
     } catch (err) {
       console.error(err);
       setBookmarkedState(!next);
