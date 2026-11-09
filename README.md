@@ -17,6 +17,7 @@ If you want to try your hand at self-hosting this app, you will need to first ge
 
 # Documentation
 [Tutorial](https://github.com/Work-At-JobRec/JobRec/blob/main/docs/tutorial.md)
+[How To](https://github.com/Work-At-JobRec/JobRec/blob/main/docs/how-to.md)
 
 # Contributors
 - Luna Brown
