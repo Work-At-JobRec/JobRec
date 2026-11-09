@@ -9,7 +9,6 @@ const SALARY_UNITS = { yr: "Year", year: "Year", mo: "Month", month: "Month", hr
 export const EMPTY_FILTERS = {
   keywords: "",
   location: "",
-  radius: 10,
   salaryMin: "",
   salaryMax: "",
   salaryPer: "Year",

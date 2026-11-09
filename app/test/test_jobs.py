@@ -143,6 +143,22 @@ def test_jobs_api_filters_location_without_changing_score(jobs_client):
     assert [job["id"] for job in response.get_json()] == ["test-6"]
 
 
+def test_jobs_api_filters_location_case_insensitively(jobs_client):
+    client, headers = jobs_client
+    response = client.get("/api/jobs?location=chICaGo%2C%20il", headers=headers)
+
+    assert response.status_code == 200
+    assert [job["id"] for job in response.get_json()] == ["test-6"]
+
+
+def test_jobs_api_filters_location_with_state(jobs_client):
+    client, headers = jobs_client
+    response = client.get("/api/jobs?location=Chicago%2C%20IN", headers=headers)
+
+    assert response.status_code == 200
+    assert response.get_json() == []
+
+
 def test_job_detail_api_returns_matching_job(jobs_client):
     client, headers = jobs_client
     first_id = client.get("/api/jobs", headers=headers).get_json()[0]["id"]

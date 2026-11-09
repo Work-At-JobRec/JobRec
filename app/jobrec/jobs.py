@@ -318,17 +318,21 @@ def _ranked_jobs(
             )
 
 
-        location_query = (location or "").split(",", 1)[0].strip().casefold()
+        # Match the city or area, and honor an optional state/province token.
+        # We do not claim mile-radius matching: listings have free-text locations,
+        # not reliable geographic coordinates.
+        location_parts = [part.strip().casefold() for part in (location or "").split(",", 1)]
+        city_query = location_parts[0]
+        region_query = location_parts[1] if len(location_parts) > 1 else ""
         ranked: list[tuple[float, int, dict[str, object]]] = []
 
         for row in listing_rows:
 
             listing = to_job_listing(row)
-
-            if (
-                location_query
-                and location_query not in (listing.location or "").casefold()
-            ):
+            job_location = (listing.location or "").casefold()
+            if city_query and city_query not in job_location:
+                continue
+            if region_query and region_query not in job_location:
                 continue
 
             requirements = requirements_by_listing.get(row.id, [])

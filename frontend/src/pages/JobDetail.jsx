@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
-import LocationBar from "../components/LocationBar.jsx";
 import { ClockIcon, DollarIcon, FlagIcon, PinIcon, PushpinIcon } from "../components/Icons.jsx";
 import { compatibilityColor, fetchJob, reportJob } from "../api/jobs.js";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
@@ -112,10 +111,6 @@ export default function JobDetail() {
       <Navbar />
       <main className="page-zoom max-w-[1100px] mx-auto px-6 pb-16">
         <h1 className="text-center text-[56px] font-bold mt-16 mb-10">Here are the Best Jobs For You:</h1>
-        <div className="flex justify-center">
-          <LocationBar />
-        </div>
-
         <Link to="/jobs" className="inline-block mt-10 mb-3 text-lg text-[#8a8a8a] hover:text-[#E75A8F] no-underline">
           ← Back to all jobs
         </Link>

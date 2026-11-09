@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
 import JobCard from "../components/JobCard.jsx";
@@ -71,10 +71,8 @@ function Filters({ filters, update }) {
     <div className="mt-6 flex flex-col gap-8 text-[22px]">
       <LocationBar
         location={filters.location}
-        radius={filters.radius}
         onLocationChange={(location) => update({ location })}
-        onRadiusChange={(radius) => update({ radius })}
-        placeholder="West Lafayette, IN"
+        placeholder="City, State (e.g. Chicago, IL)"
       />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
@@ -162,25 +160,35 @@ export default function Search() {
   const [filtersOpen, setFiltersOpen] = useState(true);
   const { getAccessTokenSilently, isLoading, isAuthenticated } = useAuthenticatedUser();
 
-  const fetchJobs_wrapper = useCallback(async () => {
-    const accessToken = await getAccessTokenSilently();
-    fetchJobs(accessToken)
-      .then(setJobs)
-      .catch((err) => {
-        console.error(err);
-        setError("Couldn't load jobs. Is the backend running?");
-      });
-  }, [getAccessTokenSilently]);
-
+  // Ask the backend for jobs in this city before its top-five results are selected.
+  // Debounce typing and ignore responses to outdated searches.
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
+      setJobs(null);
       setError("Sign in to see recommendations");
       return;
     }
+
+    let cancelled = false;
+    setJobs(null);
     setError(null);
-    fetchJobs_wrapper();
-  }, [fetchJobs_wrapper, isLoading, isAuthenticated]);
+    const timer = setTimeout(async () => {
+      try {
+        const accessToken = await getAccessTokenSilently();
+        const results = await fetchJobs(accessToken, { location: filters.location.trim() });
+        if (!cancelled) setJobs(results);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setError("Couldn't load jobs. Please try again.");
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [getAccessTokenSilently, isLoading, isAuthenticated, filters.location]);
 
   const update = (changes) => setFilters((current) => ({ ...current, ...changes }));
   const results = jobs && filterJobs(jobs, filters);
