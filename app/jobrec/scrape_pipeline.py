@@ -1,7 +1,7 @@
 """End-to-end scraping run: fetch from every source, clean, validate, and store."""
 
 import logging
-from typing import Iterable
+from typing import Iterable, Optional
 
 from sqlalchemy import Engine
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_scrape_pipeline(
-    engine: Engine, scrapers: Iterable[BaseScraper]
+    engine: Engine, scrapers: Iterable[BaseScraper], max_listings: Optional[int] = None
 ) -> UpsertResult:
     """Fetch jobs from every scraper, normalize and validate them, and store the result.
 
@@ -23,9 +23,12 @@ def run_scrape_pipeline(
     are skipped (logged by validation), and listings already stored are updated
     rather than duplicated. New listings and changed descriptions are marked for
     skill extraction by the separate listing_skill_extractor workload.
+    ``max_listings`` keeps only the first N valid listings, for small test databases.
     """
     fetched = fetch_all(scrapers)
     valid = filter_valid_listings(normalize_listings(fetched))
+    if max_listings is not None:
+        valid = valid[:max_listings]
     result = upsert_listings(engine, valid)
     logger.info(
         "Scrape pipeline: %d fetched, %d valid, %d new, %d already stored",
