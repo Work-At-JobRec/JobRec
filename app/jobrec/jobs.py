@@ -10,26 +10,28 @@ are served only when no database is given or nothing is stored yet, so a fresh
 checkout still shows something.
 
 Salary comes from the listing's scraped pay, and job type is inferred from the
-title. Compatibility and requirement matches will come from the matching
-algorithm; until then they are empty for real listings (the samples keep their
-placeholders in SAMPLE_MATCHES).
+title. Compatibility combines exact skill matches with distance-weighted skill
+graph matches.
 """
 
+import heapq
 import logging
 import re
 from datetime import datetime, timedelta, timezone
-import re
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from jobrec.job_listing import JobListing
-from jobrec.job_store import count_listings, get_listing, list_recent_listings
+from jobrec.job_store import (
+    count_listings,
+    list_listings_by_ids,
+    list_recent_listings,
+)
 
 logger = logging.getLogger(__name__)
 
-# How many listings /api/jobs returns unless asked otherwise, and the most it will return.
-# The frontend loads the whole list at once, so this bounds the response size.
+# Bounds for results and descriptions in the listings API.
 DEFAULT_JOB_LIMIT = 500
 MAX_JOB_LIMIT = 1000
 # Length of the description sent with each job in the list; the detail route sends it in full.
@@ -50,9 +52,14 @@ _JOB_TYPE_PATTERNS = (
 )
 from jobrec.job_store import JobListingTable, to_job_listing
 from jobrec.openaiapi import UserInfoTable
-from jobrec.skill_detection import CanonicalSkillTable, ListingSkillTable
+from jobrec.skill_detection import (
+    CanonicalSkillTable,
+    ListingSkillTable,
+    SkillConnectionTable,
+)
 
 MAX_JOB_RESULTS = 5
+MAX_PAGE_SIZE = 50
 _ANNUAL_MULTIPLIERS = {
     "year": 1,
     "annual": 1,
@@ -141,17 +148,21 @@ def _store_has_listings(engine):
     return engine is not None and count_listings(engine) > 0
 
 
-def get_job_listings(engine=None, limit=None, summary=True):
+def get_job_listings(engine=None, limit=None, summary=True, offset=0):
     """Return the listings to show: stored ones (newest first, short descriptions), else the samples."""
+    limit = max(1, min(DEFAULT_JOB_LIMIT if limit is None else limit, MAX_JOB_LIMIT))
+    offset = max(0, offset)
     if not _store_has_listings(engine):
         if engine is not None:
             logger.warning(
                 "No stored job listings found; serving the sample listings instead"
             )
-        return SAMPLE_LISTINGS
-    limit = max(1, min(DEFAULT_JOB_LIMIT if limit is None else limit, MAX_JOB_LIMIT))
+        return SAMPLE_LISTINGS[offset : offset + limit]
     listings = list_recent_listings(
-        engine, limit, description_chars=LIST_DESCRIPTION_CHARS if summary else None
+        engine,
+        limit,
+        description_chars=LIST_DESCRIPTION_CHARS if summary else None,
+        offset=offset,
     )
     return [
         listing
@@ -265,106 +276,232 @@ def _profile_skills(session: Session, user_id: str) -> dict[str, int]:
     return skills
 
 
+def _skill_credits(
+    session: Session, applicant_skills: dict[str, int]
+) -> dict[int, float]:
+    """Return proficiency-adjusted credit from each skill's nearest applicant skill."""
+    if not applicant_skills:
+        return {}
+    root_rows = list(
+        session.execute(
+            select(CanonicalSkillTable.id, CanonicalSkillTable.normalized_name)
+            .where(CanonicalSkillTable.normalized_name.in_(applicant_skills))
+        )
+    )
+    if not root_rows:
+        return {}
+
+    adjacency: dict[int, list[tuple[int, float]]] = {}
+    for skill_a_id, skill_b_id, distance in session.execute(
+        select(
+            SkillConnectionTable.skill_a_id,
+            SkillConnectionTable.skill_b_id,
+            SkillConnectionTable.distance,
+        )
+    ):
+        adjacency.setdefault(skill_a_id, []).append((skill_b_id, distance))
+        adjacency.setdefault(skill_b_id, []).append((skill_a_id, distance))
+
+    root_proficiency: dict[int, int] = {}
+    for skill_id, normalized_name in root_rows:
+        root_proficiency[skill_id] = max(
+            root_proficiency.get(skill_id, 0), applicant_skills[normalized_name]
+        )
+
+    closest: dict[int, tuple[float, int]] = {
+        skill_id: (0.0, proficiency)
+        for skill_id, proficiency in root_proficiency.items()
+    }
+    pending = [
+        (0.0, -proficiency, skill_id)
+        for skill_id, proficiency in root_proficiency.items()
+    ]
+    heapq.heapify(pending)
+    while pending:
+        distance, negative_proficiency, skill_id = heapq.heappop(pending)
+        proficiency = -negative_proficiency
+        if closest.get(skill_id) != (distance, proficiency):
+            continue
+        for neighbor_id, edge_distance in adjacency.get(skill_id, ()):
+            next_distance = distance + edge_distance
+            previous = closest.get(neighbor_id)
+            if previous is None or next_distance < previous[0] or (
+                next_distance == previous[0] and proficiency > previous[1]
+            ):
+                closest[neighbor_id] = (next_distance, proficiency)
+                heapq.heappush(
+                    pending, (next_distance, -proficiency, neighbor_id)
+                )
+
+    credits = {
+        skill_id: proficiency / 4 / (1 + distance)
+        for skill_id, (distance, proficiency) in closest.items()
+    }
+    return credits
+
+
+def _listing_requirements(
+    session: Session, listing_id: int
+) -> list[tuple[int, str, int]]:
+    return list(
+        session.execute(
+            select(
+                ListingSkillTable.skill_id,
+                CanonicalSkillTable.skill_name,
+                ListingSkillTable.proficiency_level,
+            )
+            .join(
+                CanonicalSkillTable,
+                CanonicalSkillTable.id == ListingSkillTable.skill_id,
+            )
+            .where(ListingSkillTable.listing_id == listing_id)
+        )
+    )
+
+
+def _compatibility(
+    requirements: list[tuple[int, str, int]],
+    applicant_skills: dict[str, int],
+    graph_credits: dict[int, float],
+) -> tuple[float, list[dict[str, object]]]:
+    denominator = sum(required / 4 for _, _, required in requirements)
+    numerator = 0.0
+    displayed_requirements: list[dict[str, object]] = []
+    for skill_id, name, required in requirements:
+        exact_credit = (
+            applicant_skills.get(_normalized_skill_name(name), 0) / 4
+        )
+        credit = max(exact_credit, graph_credits.get(skill_id, 0.0))
+        numerator += (required / 4) * credit
+        displayed_requirements.append(
+            {
+                "text": f"Requires proficiency level {required}/4",
+                "skill": name,
+                "met": credit >= required / 4,
+            }
+        )
+    return (numerator / denominator if denominator else 0.0), displayed_requirements
+
 
 def _ranked_jobs(
     engine: Engine,
     user_id: str,
     desired_salary: float | None,
     location: str | None,
+    page: int = 1,
+    page_size: int = MAX_JOB_RESULTS,
 ) -> list[dict[str, object]]:
-    with Session(engine) as session:
-        applicant_skills = _profile_skills(session, user_id)
-        listing_rows = list(
-            session.scalars(
-                select(JobListingTable)
-                .where(JobListingTable.status == "open")
-                .order_by(JobListingTable.id)
+    _validate_pagination(page, page_size)
+    location_query = (location or "").split(",", 1)[0].strip().casefold()
+    listing_filter = [JobListingTable.status == "open"]
+    if location_query:
+        listing_filter.append(
+            func.lower(func.coalesce(JobListingTable.location, "")).contains(
+                location_query, autoescape=True
             )
         )
 
+    with Session(engine) as session:
+        applicant_skills = _profile_skills(session, user_id)
+        graph_credits = _skill_credits(session, applicant_skills)
+        listing_rows = list(
+            session.execute(
+                select(
+                    JobListingTable.id,
+                    JobListingTable.source,
+                    JobListingTable.source_job_id,
+                    JobListingTable.title,
+                    JobListingTable.company_name,
+                    JobListingTable.location,
+                    JobListingTable.application_url,
+                    JobListingTable.posted_at,
+                    JobListingTable.pay,
+                )
+                .where(*listing_filter)
+                .order_by(JobListingTable.id)
+            )
+        )
         if not listing_rows:
             return []
 
-        listing_ids = [row.id for row in listing_rows]
-
-        # Retrieve job skills in batches to avoid SQLite's
-        # maximum number of SQL variables per query.
-        BATCH_SIZE = 500
-        skill_rows = []
-
-        for i in range(0, len(listing_ids), BATCH_SIZE):
-            batch_ids = listing_ids[i:i + BATCH_SIZE]
-
-            batch_rows = session.execute(
-                select(
-                    ListingSkillTable.listing_id,
-                    CanonicalSkillTable.skill_name,
-                    ListingSkillTable.proficiency_level,
-                )
-                .join(
-                    CanonicalSkillTable,
-                    CanonicalSkillTable.id == ListingSkillTable.skill_id,
-                )
-                .where(ListingSkillTable.listing_id.in_(batch_ids))
+        skill_rows = session.execute(
+            select(
+                ListingSkillTable.listing_id,
+                ListingSkillTable.skill_id,
+                CanonicalSkillTable.skill_name,
+                ListingSkillTable.proficiency_level,
             )
-
-            skill_rows.extend(batch_rows)
-
-        requirements_by_listing: dict[int, list[tuple[str, int]]] = {}
-
-        for listing_id, skill_name, proficiency in skill_rows:
+            .join(
+                JobListingTable,
+                JobListingTable.id == ListingSkillTable.listing_id,
+            )
+            .join(
+                CanonicalSkillTable,
+                CanonicalSkillTable.id == ListingSkillTable.skill_id,
+            )
+            .where(*listing_filter)
+        )
+        requirements_by_listing: dict[int, list[tuple[int, str, int]]] = {}
+        for listing_id, skill_id, skill_name, proficiency in skill_rows:
             requirements_by_listing.setdefault(listing_id, []).append(
-                (skill_name, proficiency)
+                (skill_id, skill_name, proficiency)
             )
 
-
-        location_query = (location or "").split(",", 1)[0].strip().casefold()
-        ranked: list[tuple[float, int, dict[str, object]]] = []
-
+        ranked: list[tuple[float, int, float, list[tuple[int, str, int]]]] = []
         for row in listing_rows:
-
-            listing = to_job_listing(row)
-
-            if (
-                location_query
-                and location_query not in (listing.location or "").casefold()
+            if row.source_job_id and any(
+                character in row.source_job_id for character in _UNSAFE_ID_CHARS
             ):
                 continue
-
             requirements = requirements_by_listing.get(row.id, [])
-
-            denominator = sum(required / 4 for _, required in requirements)
-
-            numerator = sum(
-                (required / 4)
-                * (applicant_skills.get(_normalized_skill_name(name), 0) / 4)
-                for name, required in requirements
+            compatibility, _ = _compatibility(
+                requirements, applicant_skills, graph_credits
             )
+            if desired_salary is None:
+                search_index = compatibility
+            else:
+                salary_score = _salary_score(row.pay, desired_salary)
+                search_index = 0.7 * compatibility + 0.3 * salary_score
+            ranked.append((search_index, row.id, compatibility, requirements))
 
-            compatibility = numerator / denominator if denominator else 0.0
-            salary_score = _salary_score(listing.pay, desired_salary)
-            search_index = 0.7 * compatibility + 0.3 * salary_score
+        page_end = page * page_size
+        page_start = page_end - page_size
+        selected = heapq.nsmallest(
+            page_end, ranked, key=lambda item: (-item[0], item[1])
+        )[page_start:page_end]
+        if not selected:
+            return []
 
-            displayed_requirements = [
-                {
-                    "text": f"Requires proficiency level {required}/4",
-                    "skill": name,
-                    "met": applicant_skills.get(_normalized_skill_name(name), 0)
-                    >= required,
-                }
-                for name, required in requirements
-            ]
-
-            job = to_api_job(listing)
-            job["id"] = f"{listing.source}-{listing.source_job_id or row.id}"
+        listings = list_listings_by_ids(
+            engine,
+            [listing_id for _, listing_id, _, _ in selected],
+            description_chars=LIST_DESCRIPTION_CHARS,
+        )
+        listing_by_id = {
+            listing_id: listing
+            for (_, listing_id, _, _), listing in zip(selected, listings)
+        }
+        jobs: list[dict[str, object]] = []
+        for _, listing_id, compatibility, requirements in selected:
+            listing = listing_by_id.get(listing_id)
+            if listing is None:
+                continue
+            job = to_api_job(listing, summary=True)
+            job["id"] = f"{listing.source}-{listing.source_job_id or listing_id}"
             job["salary"] = listing.pay
             job["compatibility"] = round(compatibility * 100)
-            job["requirements"] = displayed_requirements
+            job["requirements"] = _compatibility(
+                requirements, applicant_skills, graph_credits
+            )[1]
+            jobs.append(job)
+        return jobs
 
-            ranked.append((search_index, row.id, job))
 
-        ranked.sort(key=lambda item: (-item[0], item[1]))
-        return [job for _, _, job in ranked]
+def _validate_pagination(page: int, page_size: int) -> None:
+    if page < 1:
+        raise ValueError("page must be at least 1")
+    if page_size < 1 or page_size > MAX_PAGE_SIZE:
+        raise ValueError(f"page_size must be between 1 and {MAX_PAGE_SIZE}")
 
 
 def get_jobs(
@@ -373,17 +510,30 @@ def get_jobs(
     desired_salary: float | None = None,
     location: str | None = None,
     limit: int | None = None,
+    page: int = 1,
+    page_size: int = MAX_JOB_RESULTS,
 ) -> list[dict[str, object]]:
+    _validate_pagination(page, page_size)
+    offset = (page - 1) * page_size
     if engine is None:
-        return [to_api_job(listing, summary=True) for listing in get_job_listings()][
-            :MAX_JOB_RESULTS
-        ]
-    if user_id is None:
         return [
             to_api_job(listing, summary=True)
-            for listing in get_job_listings(engine, limit)[:MAX_JOB_RESULTS]
+            for listing in get_job_listings(summary=True)[offset : offset + page_size]
         ]
-    return _ranked_jobs(engine, user_id, desired_salary, location)[:MAX_JOB_RESULTS]
+    if user_id is None:
+        listing_limit = (
+            page_size if limit is None else min(limit, page_size, MAX_PAGE_SIZE)
+        )
+        listing_limit = max(1, listing_limit)
+        return [
+            to_api_job(listing, summary=True)
+            for listing in get_job_listings(
+                engine, listing_limit, summary=True, offset=offset
+            )
+        ]
+    return _ranked_jobs(
+        engine, user_id, desired_salary, location, page=page, page_size=page_size
+    )
 
 
 def get_job(
@@ -392,13 +542,50 @@ def get_job(
     user_id: str | None = None,
     desired_salary: float | None = None,
 ) -> dict[str, object] | None:
-    """Return the job with the given id, or None if it doesn't exist."""
-    if engine is None:
-        jobs = [to_api_job(listing) for listing in get_job_listings(summary=False)]
-    elif user_id is None:
-        jobs = [
-            to_api_job(listing) for listing in get_job_listings(engine, summary=False)
-        ]
-    else:
-        jobs = _ranked_jobs(engine, user_id, desired_salary, None)
-    return next((job for job in jobs if job["id"] == id_), None)
+    """Return a single job by id without loading other listing descriptions."""
+    if engine is None or not _store_has_listings(engine):
+        return next(
+            (
+                to_api_job(listing)
+                for listing in SAMPLE_LISTINGS
+                if to_api_job(listing)["id"] == id_
+            ),
+            None,
+        )
+
+    source, separator, source_job_id = id_.partition("-")
+    if not separator or not source or not source_job_id:
+        return None
+    if any(character in source_job_id for character in _UNSAFE_ID_CHARS):
+        return None
+
+    with Session(engine) as session:
+        row = session.scalar(
+            select(JobListingTable).where(
+                JobListingTable.source == source,
+                JobListingTable.source_job_id == source_job_id,
+            )
+        )
+        if row is None and user_id is not None and source_job_id.isdecimal():
+            row = session.get(JobListingTable, int(source_job_id))
+            if row is not None and row.source != source:
+                row = None
+        if row is None or (user_id is not None and row.status != "open"):
+            return None
+
+        listing = to_job_listing(row)
+        job = to_api_job(listing)
+        if user_id is None:
+            return job
+
+        applicant_skills = _profile_skills(session, user_id)
+        graph_credits = _skill_credits(session, applicant_skills)
+        requirements = _listing_requirements(session, row.id)
+        compatibility, displayed_requirements = _compatibility(
+            requirements, applicant_skills, graph_credits
+        )
+        job["id"] = f"{listing.source}-{listing.source_job_id or row.id}"
+        job["salary"] = listing.pay
+        job["compatibility"] = round(compatibility * 100)
+        job["requirements"] = displayed_requirements
+        return job

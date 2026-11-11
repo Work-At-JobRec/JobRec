@@ -12,6 +12,7 @@ import jobrec.skill_detection  # noqa: E402
 import jobrec.openaiapi  # noqa: E402
 from jobrec.skill_detection import (  # noqa: E402
     DiscoveredSkill,
+    SkillConnection,
     SkillRanking,
     UnconstrainedSkillResult,
     _constrained_result_model,
@@ -139,6 +140,43 @@ def test_detection_caps_the_constrained_schema_candidates(monkeypatch):
 
     schema = requested_formats[0].model_json_schema()
     assert schema["$defs"]["CatalogSkillName"]["enum"] == ["Python"]
+
+
+def test_detection_keeps_only_connections_to_existing_candidates(monkeypatch):
+    class FakeResponses:
+        def parse(self, **kwargs):
+            if kwargs["text_format"].__name__ == "ConstrainedSkillResult":
+                result = kwargs["text_format"].model_validate({"skills": []})
+            else:
+                result = UnconstrainedSkillResult(
+                    skills=[
+                        DiscoveredSkill(
+                            skill_name="Rust",
+                            proficiency_level=3,
+                            related_skills=[
+                                SkillConnection(skill_name="Python", distance=0.2),
+                                SkillConnection(
+                                    skill_name="Unlisted", distance=0.1
+                                ),
+                            ],
+                        )
+                    ]
+                )
+            return SimpleNamespace(output_parsed=result, usage=None)
+
+    monkeypatch.setattr(
+        jobrec.skill_detection, "_client", SimpleNamespace(responses=FakeResponses())
+    )
+
+    _, discovered = detect_document_skills(
+        "Python and Rust programming",
+        ["Python"],
+        document_type="job listing",
+    )
+
+    assert discovered[0].related_skills == [
+        SkillConnection(skill_name="Python", distance=0.2)
+    ]
 
 
 def test_resume_parser_uses_dynamic_skill_detection(tmp_path, monkeypatch):

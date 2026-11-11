@@ -10,7 +10,7 @@ from typing import cast
 
 from openai import OpenAI
 from pydantic import BaseModel, Field, create_model
-from sqlalchemy import ForeignKey, Integer, String, select, update
+from sqlalchemy import Float, ForeignKey, Integer, String, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -42,6 +42,13 @@ class _ConstrainedSkillResult(BaseModel):
     skills: list[_CatalogSkillRanking]
 
 
+class SkillConnection(BaseModel):
+    skill_name: str = Field(..., description="Canonical name of an existing skill")
+    distance: float = Field(
+        ..., gt=0, le=1, description="Semantic distance to the existing skill"
+    )
+
+
 class DiscoveredSkill(BaseModel):
     skill_name: str = Field(..., description="Name of a genuinely new skill")
     proficiency_level: int = Field(
@@ -50,6 +57,7 @@ class DiscoveredSkill(BaseModel):
         le=4,
         description="Proficiency or requirement level from 1 (basic) to 4 (expert)",
     )
+    related_skills: list[SkillConnection] = Field(default_factory=list, max_length=5)
 
 
 class UnconstrainedSkillResult(BaseModel):
@@ -64,6 +72,18 @@ class CanonicalSkillTable(Base):
         String(255), unique=True, nullable=False
     )
     skill_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class SkillConnectionTable(Base):
+    __tablename__ = "canonical_skill_connections"
+
+    skill_a_id: Mapped[int] = mapped_column(
+        ForeignKey("canonical_skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    skill_b_id: Mapped[int] = mapped_column(
+        ForeignKey("canonical_skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    distance: Mapped[float] = mapped_column(Float, nullable=False)
 
 
 class ListingSkillTable(Base):
@@ -208,16 +228,44 @@ def persist_discovered_skills(engine: Engine, skills: list[DiscoveredSkill]) -> 
 
 
 def _persist_discovered_skills(session: Session, skills: list[DiscoveredSkill]) -> None:
-    existing = set(session.scalars(select(CanonicalSkillTable.normalized_name)))
+    catalog = {
+        row.normalized_name: row
+        for row in session.scalars(select(CanonicalSkillTable))
+    }
     for skill in skills:
         normalized = _normalized_name(skill.skill_name)
-        if normalized and normalized not in existing:
-            session.add(
-                CanonicalSkillTable(
-                    normalized_name=normalized, skill_name=skill.skill_name.strip()
-                )
+        if normalized and normalized not in catalog:
+            row = CanonicalSkillTable(
+                normalized_name=normalized, skill_name=skill.skill_name.strip()
             )
-            existing.add(normalized)
+            session.add(row)
+            catalog[normalized] = row
+
+    session.flush()
+    existing_connections = {
+        (row.skill_a_id, row.skill_b_id): row
+        for row in session.scalars(select(SkillConnectionTable))
+    }
+    for skill in skills:
+        source = catalog.get(_normalized_name(skill.skill_name))
+        if source is None:
+            continue
+        for connection in skill.related_skills:
+            target = catalog.get(_normalized_name(connection.skill_name))
+            if target is None or target.id == source.id:
+                continue
+            edge_key = (min(source.id, target.id), max(source.id, target.id))
+            existing = existing_connections.get(edge_key)
+            if existing is None:
+                existing = SkillConnectionTable(
+                    skill_a_id=edge_key[0],
+                    skill_b_id=edge_key[1],
+                    distance=connection.distance,
+                )
+                session.add(existing)
+                existing_connections[edge_key] = existing
+            else:
+                existing.distance = min(existing.distance, connection.distance)
 
 
 def detect_document_skills(
@@ -297,14 +345,19 @@ def detect_document_skills(
             f"Find skills genuinely evidenced or required by this {document_type} that are "
             "missing from the already matched skill list. Do not return any catalog skill, "
             "synonym, alternate spelling, or a narrower/broader version of an existing skill. "
-            "Do not infer skills from a title alone. Include a concise broad category and rate "
-            "proficiency/requirement from 1 (basic) to 4 (expert). Return an empty list if none."
+            "Do not infer skills from a title alone. Rate proficiency/requirement from 1 "
+            "(basic) to 4 (expert). For each new skill, optionally connect it to at most five "
+            "closely related existing catalog skills listed in the input. Use the exact catalog "
+            "name and estimate distance from 0.01 (very close) to 1.0 (loosely related); "
+            "smaller distances mean stronger relationships. Do not connect a skill to itself. "
+            "Return an empty list if no new skills are found."
         ),
         input=[
             {
                 "role": "user",
                 "content": (
                     f"Already matched canonical skills: {list(matched.values())!r}\n\n"
+                    f"Existing catalog skills available for graph connections: {candidates!r}\n\n"
                     f"Original document:\n{document_text}"
                 ),
             }
@@ -324,10 +377,24 @@ def detect_document_skills(
             normalized = _normalized_name(skill.skill_name)
             if not normalized or normalized in catalog_by_name or normalized in matched:
                 continue
+            related_skills: dict[str, SkillConnection] = {}
+            for connection in skill.related_skills:
+                target = catalog_by_name.get(_normalized_name(connection.skill_name))
+                target_normalized = _normalized_name(target) if target else ""
+                if target is None or target_normalized == normalized:
+                    continue
+                previous = related_skills.get(target_normalized)
+                if previous is None or connection.distance < previous.distance:
+                    related_skills[target_normalized] = SkillConnection(
+                        skill_name=target, distance=connection.distance
+                    )
             ranking = discovered.get(normalized)
             if ranking is None or skill.proficiency_level > ranking.proficiency_level:
                 discovered[normalized] = skill.model_copy(
-                    update={"skill_name": " ".join(skill.skill_name.strip().split())}
+                    update={
+                        "skill_name": " ".join(skill.skill_name.strip().split()),
+                        "related_skills": list(related_skills.values()),
+                    }
                 )
 
     return list(matched.values()), list(discovered.values())
