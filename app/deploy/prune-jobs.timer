@@ -1,0 +1,9 @@
+[Unit]
+Description=Prune closed job listings weekly, on Sundays at 1:23 PM (four hours after the daily scrape)
+
+[Timer]
+OnCalendar=Sun *-*-* 13:23:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
