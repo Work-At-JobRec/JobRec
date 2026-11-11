@@ -113,14 +113,6 @@ def get_candidate_percentile():
     return jsonify("not implemented"), 500
 
 
-# prune jobs from the database which are closed
-@app.route("/api/prune", methods=["POST"])
-@require_auth
-def prune_old_jobs():
-    # TODO: ensure user is admin, then prune
-    raise NotImplementedError
-
-
 @app.route("/api/run_scraper", methods=["POST"])
 @require_auth
 def start_scraper():
