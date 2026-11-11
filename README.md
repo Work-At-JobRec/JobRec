@@ -16,6 +16,7 @@ If you want to try your hand at self-hosting this app, you will need to first ge
 3. Upload your resume and start using the site
 
 # Documentation
+[Reference](doc/reference.md): system structure, APIs, configuration, database schemas, job sources, and listing pruning
 [Tutorial](https://github.com/Work-At-JobRec/JobRec/blob/main/docs/tutorial.md)
 [How To](https://github.com/Work-At-JobRec/JobRec/blob/main/docs/how-to.md)
 
