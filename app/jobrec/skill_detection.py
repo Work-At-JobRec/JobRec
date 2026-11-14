@@ -6,7 +6,7 @@ import re
 from collections import Counter
 from enum import Enum
 from pathlib import Path
-from typing import cast
+from typing import Optional, cast
 
 from openai import OpenAI
 from pydantic import BaseModel, Field, create_model
@@ -106,6 +106,41 @@ def _openai_client() -> OpenAI:
     if _client is None:
         _client = OpenAI()
     return _client
+
+
+# Discovered skills become shared catalog entries, so a name the model returns is
+# checked before it is stored (#125). The limits were set against the real catalog:
+# long descriptive skills are normal there, but sentences, links, markup and
+# instruction-like text are not skills.
+MAX_SKILL_NAME_LENGTH = 150
+_URL = re.compile(r"(?i)://|\bwww\.|\b[\w-]+\.(com|org|net|io|ai|dev|co|edu|gov|app)/")
+_MARKUP_OR_CONTROL = re.compile(r"[<>{}`\\|\x00-\x1f\x7f]")
+_INSTRUCTION_LIKE = re.compile(
+    r"(?i)\b(ignore|disregard|forget|override)\b.{0,40}\b(previous|prior|above|earlier|all|instructions?|rules)\b"
+    r"|\byou (are|must|should|will)\b|\bact as\b|\bpretend\b|\bsystem prompt\b|\binstructions?\b"
+    r"|\bassistant\b|\bdeveloper message\b"
+)
+
+
+def skill_name_problem(name: object) -> Optional[str]:
+    """Why a model-returned skill name must not be stored, or None when it is acceptable."""
+    if not isinstance(name, str) or not name.strip():
+        return "empty"
+    if len(name.strip()) > MAX_SKILL_NAME_LENGTH:
+        return f"longer than {MAX_SKILL_NAME_LENGTH} characters"
+    if not any(ch.isalnum() for ch in name):
+        return "no letters or digits"
+    if _URL.search(name):
+        return "contains a URL"
+    if _MARKUP_OR_CONTROL.search(name):
+        return "contains markup or control characters"
+    if _INSTRUCTION_LIKE.search(name):
+        return "reads like an instruction"
+    return None
+
+
+def is_valid_skill_name(name: object) -> bool:
+    return skill_name_problem(name) is None
 
 
 def _normalized_name(name: str) -> str:
@@ -233,6 +268,10 @@ def _persist_discovered_skills(session: Session, skills: list[DiscoveredSkill]) 
         for row in session.scalars(select(CanonicalSkillTable))
     }
     for skill in skills:
+        problem = skill_name_problem(skill.skill_name)
+        if problem:
+            logger.warning("Not storing skill %r: %s", skill.skill_name[:80], problem)
+            continue
         normalized = _normalized_name(skill.skill_name)
         if normalized and normalized not in catalog:
             row = CanonicalSkillTable(
@@ -374,6 +413,10 @@ def detect_document_skills(
     discovered: dict[str, DiscoveredSkill] = {}
     if unconstrained is not None:
         for skill in unconstrained.skills:
+            problem = skill_name_problem(skill.skill_name)
+            if problem:
+                logger.warning("Dropping discovered skill %r: %s", skill.skill_name[:80], problem)
+                continue
             normalized = _normalized_name(skill.skill_name)
             if not normalized or normalized in catalog_by_name or normalized in matched:
                 continue
