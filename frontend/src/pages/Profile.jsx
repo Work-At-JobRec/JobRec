@@ -41,6 +41,8 @@ function LeftPanel({
   selectedFile,
   onFileChange,
   uploadError,
+  showJobsPrompt,
+  onViewJobs,
 }) {
   const contact = userInfo ?? PLACEHOLDER_CONTACT;
 
@@ -68,6 +70,21 @@ function LeftPanel({
       )}
 
       <Avatar editable={!processing} />
+
+      {showJobsPrompt && !processing && (
+        <div role="status" aria-live="polite" className="mx-auto my-5 max-w-[360px] rounded-2xl border border-[#E75A8F] bg-white px-6 py-5">
+          <p className="mb-4 text-lg font-semibold text-black">
+            Your resume has been processed! Ready to see jobs that match your skills?
+          </p>
+          <button
+            type="button"
+            onClick={onViewJobs}
+            className="rounded-xl bg-[#E75A8F] px-6 py-3 text-lg font-semibold text-white hover:bg-[#d4508f]"
+          >
+            See Recommended Jobs
+          </button>
+        </div>
+      )}
 
       {processing ? (
         <>
@@ -306,6 +323,7 @@ export default function Profile() {
   const [userInfo, setUserInfo] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadError, setUploadError] = useState("");
+  const [uploadedThisVisit, setUploadedThisVisit] = useState(false);
   const [userPersonal, setUserpersonal] = useState(null);
   const pollTimer = useRef(null);
   const {
@@ -365,6 +383,7 @@ export default function Profile() {
 
     const previousStatus = status;
     setUploadError("");
+    setUploadedThisVisit(false);
 
     try {
       const token = await getAccessTokenSilently();
@@ -388,6 +407,7 @@ export default function Profile() {
       }
 
       setSelectedFile(null);
+      setUploadedThisVisit(true);
       await fetchProfile();
 
     } catch (error) {
@@ -441,6 +461,8 @@ export default function Profile() {
               setUploadError("");
             }}
             uploadError={uploadError}
+            showJobsPrompt={uploadedThisVisit && status === "done" && !!userInfo}
+            onViewJobs={() => navigate("/jobs")}
           />
           {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} onRemoveSkill={handleRemoveSkill} />}
         </main>
