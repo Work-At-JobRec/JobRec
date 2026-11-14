@@ -198,6 +198,7 @@ Read from the process environment and from `app/.env` (via `python-dotenv`).
 | `APP_BASE_URL` | `app.py` (only when run as `python -m jobrec.app`) | for local runs | none | `http://localhost:5001`; port defaults to 5001 |
 | `DEV` | `app.py` | no | unset | When set, every `user_info` row is deleted at startup |
 | `JOBREC_LLM_MODEL` | `llm_scraper.py` | no | `gpt-5.2` | Model for the LLM fallback scraper |
+| `JOBREC_LLM_MAX_CALLS` | `llm_scraper.py` | no | `300` | Model calls allowed in one scrape run across every `llm` source; cached pages do not count |
 | `TEST_DATABASE_URL` | `app/test/conftest.py` | no | unset (tests use SQLite) | Postgres URL whose database name contains `test` |
 | `DEPLOYMENT` | systemd units | no | `True` on the host | Set by every unit; not read by backend code on `main` |
 | `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE` | `frontend/src/main.jsx` | yes (frontend build) | none | Auth0 SPA settings, baked in at `vite build` |
@@ -306,7 +307,7 @@ Tables are created by SQLAlchemy (`Base.metadata.create_all` and `ensure_job_lis
 | `lever` | company slug (`palantir`) | `GET https://api.lever.co/v0/postings/{id}?mode=json` | none | never at scrape time (listed postings are open) |
 | `ashby` | organization slug (`ramp`) | `GET https://api.ashbyhq.com/posting-api/job-board/{id}?includeCompensation=true` | none | `isListed` is `false` |
 | `workday` | `host/site` (`nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite`) | `POST https://{host}/wday/cxs/{tenant}/{site}/jobs`, `{"limit": 20, "offset": N}` | 20 per page, at most 5 pages (100 postings) | `canApply` is `false` |
-| `llm` | careers page URL | Page HTML read by an OpenAI model (`JOBREC_LLM_MODEL`) | at most 200 postings, 40,000 page characters | the page says the job is closed |
+| `llm` | careers page URL | Page HTML read by an OpenAI model (`JOBREC_LLM_MODEL`) | at most 200 postings, 40,000 page characters, `JOBREC_LLM_MAX_CALLS` model calls per run; a page that renders with JavaScript falls back to its schema.org `JobPosting` data, then its `sitemap.xml` | the page says the job is closed (or `validThrough` has passed) |
 
 `tenant` is the first label of the Workday host (`nvidia`). Every scraper also stores the source's job id as `source_job_id`.
 
