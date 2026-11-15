@@ -225,16 +225,51 @@ def _parse_uploaded_resume(file_id: str):
     )
 
 
-def update_user_info(
-    user_id: str,
-    name: str | None,
-    email: str | None,
-    phone: str | None,
-    address: str | None,
-    skills: list[SkillRanking],
-    education: list[Education],
-    projects: list[str],
-    socials: list[Social],
-    employment_history: list[Employment],
-):
-    raise NotImplementedError
+def clean_user_info(info: UserInfo) -> UserInfo:
+    """Tidy a profile the user edited by hand before it is stored.
+
+    Surrounding whitespace is trimmed, blank contact fields become null, entries
+    left completely blank are dropped, skills are de-duplicated by name (the first
+    one wins), and social links without a scheme get ``https://``.
+    """
+
+    def text(value: str | None) -> str | None:
+        value = (value or "").strip()
+        return value or None
+
+    skills: dict[str, SkillRanking] = {}
+    for skill in info.skills:
+        name = skill.skill_name.strip()
+        if name and name.lower() not in skills:
+            skills[name.lower()] = SkillRanking(
+                skill_name=name, proficiency_level=skill.proficiency_level
+            )
+
+    socials = []
+    for social in info.socials:
+        platform, url = social.platform.strip(), social.url.strip()
+        if not url:
+            continue
+        if not url.lower().startswith(("http://", "https://")):
+            url = "https://" + url
+        socials.append(Social(platform=platform or url, url=url))
+
+    return UserInfo(
+        name=text(info.name),
+        email=text(info.email),
+        phone=text(info.phone),
+        location=text(info.location),
+        skills=list(skills.values()),
+        education=[
+            Education(school=e.school.strip(), degree=e.degree.strip())
+            for e in info.education
+            if e.school.strip() or e.degree.strip()
+        ],
+        projects=[p.strip() for p in info.projects if p.strip()],
+        socials=socials,
+        employment_history=[
+            Employment(company_name=e.company_name.strip(), role=e.role.strip())
+            for e in info.employment_history
+            if e.company_name.strip() or e.role.strip()
+        ],
+    )

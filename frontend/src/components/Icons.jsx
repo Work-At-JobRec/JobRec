@@ -67,6 +67,15 @@ export function SearchIcon({ className = "w-6 h-6" }) {
   );
 }
 
+export function EditIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" />
+      <path d="M17.5 2.5a2.1 2.1 0 0 1 3 3L12 14l-4 1 1-4 8.5-8.5Z" />
+    </svg>
+  );
+}
+
 export function CheckIcon({ className = "w-6 h-6" }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
