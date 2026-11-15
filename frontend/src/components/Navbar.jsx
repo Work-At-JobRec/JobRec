@@ -1,8 +1,13 @@
 import { Link, NavLink } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 
-const navLinkClass =
-  "text-[28px] font-bold justify-self-center text-white no-underline hover:text-[#E75A8F] transition-colors";
+const navLinkBase =
+  "text-[28px] font-bold justify-self-center no-underline hover:text-[#E75A8F] transition-colors";
+
+// NavLink passes isActive; the current page's link is shown in the accent color.
+// Buttons (Log In / Log Out) call it with no arguments and stay white.
+const navLinkClass = ({ isActive } = {}) =>
+  `${navLinkBase} ${isActive ? "text-[#E75A8F]" : "text-white"}`;
 
 export default function Navbar() {
   const {
@@ -53,7 +58,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={handleLogout}
-              className={`${navLinkClass} cursor-pointer`}
+              className={`${navLinkClass()} cursor-pointer`}
             >
               Log Out
             </button>
@@ -62,7 +67,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() => loginWithRedirect()}
-            className={`${navLinkClass} cursor-pointer`}
+            className={`${navLinkClass()} cursor-pointer`}
           >
             Log In
           </button>
