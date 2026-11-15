@@ -1,0 +1,13 @@
+[Unit]
+Description=Remove stored job listings that no longer accept applicants
+After=network.target
+
+[Service]
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/jobrec/app
+Environment="DEPLOYMENT=True"
+ExecStart=/home/ec2-user/.local/bin/poetry run python -m jobrec.prune_jobs --delete
+
+[Install]
+WantedBy=multi-user.target

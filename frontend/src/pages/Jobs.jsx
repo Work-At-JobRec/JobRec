@@ -36,7 +36,7 @@ export default function Jobs() {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      <main className="max-w-[1400px] mx-auto px-6 pb-16">
+      <main className="page-zoom max-w-[1400px] mx-auto px-6 pb-16">
         <h1 className="text-center text-[56px] font-bold mt-24 mb-8">Here are the Best Jobs For You:</h1>
         <div className="mb-12">
           <JobListLinks />
