@@ -47,7 +47,11 @@ def make_listing(**overrides) -> JobListing:
 
 def as_utc(value: datetime) -> datetime:
     """Stored timestamps as timezone-aware UTC: SQLite returns them naive, Postgres aware."""
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return (
+        value.replace(tzinfo=timezone.utc)
+        if value.tzinfo is None
+        else value.astimezone(timezone.utc)
+    )
 
 
 def rows(engine) -> list[JobListingTable]:
@@ -300,9 +304,12 @@ def test_count_listings_counts_rows(engine):
 
 # --- values that Postgres would reject (#97) ---
 
+
 # A pay line longer than its column is shortened instead of failing the whole batch
 def test_long_pay_is_clipped_to_column_length(engine):
-    long_pay = "; ".join(f"USD {n},000-{n + 20},000 (Range {n})" for n in range(100, 130))
+    long_pay = "; ".join(
+        f"USD {n},000-{n + 20},000 (Range {n})" for n in range(100, 130)
+    )
     assert len(long_pay) > 255
 
     result = upsert_listings(engine, [make_listing(pay=long_pay)])
@@ -315,7 +322,10 @@ def test_long_pay_is_clipped_to_column_length(engine):
 
 # Every length-limited text column is clipped the same way
 def test_long_title_company_and_location_are_clipped(engine):
-    upsert_listings(engine, [make_listing(title="T" * 600, company_name="C" * 300, location="L" * 300)])
+    upsert_listings(
+        engine,
+        [make_listing(title="T" * 600, company_name="C" * 300, location="L" * 300)],
+    )
 
     row = rows(engine)[0]
 
@@ -336,7 +346,9 @@ def test_clipped_listing_rerun_is_unchanged(engine):
 
 # NUL bytes, which Postgres refuses to store in text, are removed
 def test_nul_bytes_are_removed_from_text(engine):
-    upsert_listings(engine, [make_listing(description="Build\x00 things.", title="Engi\x00neer")])
+    upsert_listings(
+        engine, [make_listing(description="Build\x00 things.", title="Engi\x00neer")]
+    )
 
     row = rows(engine)[0]
 
@@ -354,7 +366,9 @@ def test_listing_key_for_very_long_url_fits_the_key_column():
 
     assert len(key) <= 1024
     assert key.startswith("greenhouse:url:https://acme.com/jobs/")
-    assert key == listing_key(make_listing(source_job_id=None, application_url=long_url))
+    assert key == listing_key(
+        make_listing(source_job_id=None, application_url=long_url)
+    )
     assert key != other_key
 
 
@@ -362,8 +376,12 @@ def test_listing_key_for_very_long_url_fits_the_key_column():
 def test_very_long_urls_store_and_deduplicate(engine):
     long_url = "https://acme.com/jobs/" + "a" * 3000
 
-    upsert_listings(engine, [make_listing(source_job_id=None, application_url=long_url)])
-    result = upsert_listings(engine, [make_listing(source_job_id=None, application_url=long_url)])
+    upsert_listings(
+        engine, [make_listing(source_job_id=None, application_url=long_url)]
+    )
+    result = upsert_listings(
+        engine, [make_listing(source_job_id=None, application_url=long_url)]
+    )
 
     assert result.existing == 1
     assert count_listings(engine) == 1

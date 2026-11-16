@@ -13,6 +13,8 @@ from html.parser import HTMLParser
 from typing import Iterable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
+from pydantic import AnyHttpUrl, HttpUrl, TypeAdapter, ValidationError
+
 from jobrec.job_listing import JobListing
 
 # Tags that start a new line in the plain-text version of a description.
@@ -41,7 +43,20 @@ _SKIPPED_TAGS = {"script", "style"}
 # Only run the HTML parser on text that actually contains a tag, so plain text keeps its line breaks.
 _LOOKS_LIKE_HTML = re.compile(r"</?[a-zA-Z][^>]*>")
 _HAS_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
-_NON_WEB_SCHEMES = ("mailto:", "tel:", "javascript:")
+_NON_WEB_SCHEMES = (
+    "mailto:",
+    "tel:",
+    "javascript:",
+    "data:",
+    "file:",
+    "ftp:",
+    "resource:",
+    "tel",
+    "urn:",
+    "view-source:",
+    "ws:",
+    "wss:",
+)
 _TRACKING_PARAM_PREFIX = "utm_"
 
 
@@ -112,15 +127,21 @@ def normalize_url(url: Optional[str]) -> str:
     and host, and removes the fragment and utm_* tracking parameters. Everything
     that identifies the job (path, other query parameters and their order) is
     preserved. An empty URL stays empty so that validation can reject it.
+
+    Returns an empty string if URL is not HTTP or HTTPS
     """
     url = (url or "").strip()
     if not url or url.lower().startswith(_NON_WEB_SCHEMES):
-        return url
+        return ""
     candidate = url
     if candidate.startswith("//"):
         candidate = "https:" + candidate
     elif not _HAS_SCHEME.match(candidate):
         candidate = "https://" + candidate
+    try:
+        candidate = str(TypeAdapter(AnyHttpUrl).validate_python(candidate))
+    except ValidationError:
+        return ""
     try:
         parts = urlsplit(candidate)
         host = (parts.hostname or "").lower()

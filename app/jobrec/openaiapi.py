@@ -3,7 +3,15 @@ import os
 import traceback
 from openai import OpenAI
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    Field,
+    HttpUrl,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import sqlalchemy
@@ -23,6 +31,8 @@ _ = load_dotenv()
 logger = logging.getLogger(__name__)
 
 client = OpenAI()
+
+PREFIX_WHITELIST: tuple[str, ...] = ("https://", "http://")
 
 
 class UserInfoTable(Base):
@@ -160,12 +170,6 @@ def _store_parsed_profile(user_id, engine: sqlalchemy.Engine, user_info) -> None
             for s in user_info.socials:
                 unique_socials[s.platform.lower()] = s
 
-            user_info.socials = list(unique_socials.values())
-
-            for s in user_info.socials:
-                if s.url and not s.url.startswith("http"):
-                    s.url = "https://" + s.url
-
             skill_ranking.info = user_info.model_dump()
             skill_ranking.done_processing = True
 
@@ -202,6 +206,20 @@ def parse_resume(
             )
             for skill in discovered
         ]
+    socials: list[Social] = list(user_info.socials)
+    user_info.socials = []
+    for s in socials:
+        if s.url:
+            try:
+                s.url = str(TypeAdapter(AnyUrl).validate_python(s.url))
+            except ValidationError:
+                s.url = "https://" + s.url
+        try:
+            s.url = str(TypeAdapter(HttpUrl).validate_python(s.url))
+            user_info.socials.append(s)
+        except ValidationError:
+            # don't add to user data
+            pass
     return user_info
 
 
