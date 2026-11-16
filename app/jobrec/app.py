@@ -53,7 +53,6 @@ ALLOWED_EXTENSIONS = {"pdf", "docx"}
 os.makedirs(RESUME_FOLDER, exist_ok=True)
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = RESUME_FOLDER
-app.secret_key = "test"
 
 os.makedirs(RESUME_FOLDER, mode=600, exist_ok=True)
 
