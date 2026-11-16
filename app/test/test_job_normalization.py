@@ -168,14 +168,21 @@ def test_empty_url_stays_empty():
     assert normalize_url("   ") == ""
 
 
-# Links that are not web addresses are left alone
+# Links that are not web addresses are removed
 def test_non_web_url_left_unchanged():
-    assert normalize_url("mailto:jobs@acme.com") == "mailto:jobs@acme.com"
+    assert normalize_url("mailto:jobs@acme.com") == ""
 
 
-# A URL that cannot be parsed is returned as it was given
+# A URL that cannot be parsed is empty so validation can reject it
 def test_unparseable_url_returned_unchanged():
-    assert normalize_url("http://[::1") == "http://[::1"
+    assert normalize_url("http://[::1") == ""
+
+
+# A URL that isn't HTTPS gets parsed as an empty string
+def test_non_http_url_becomes_empty():
+    assert normalize_url("ftp://example.com/virus.exe") == ""
+    assert normalize_url("javascript:steal_your_password()") == ""
+    assert normalize_url("data:text/plain,IGNOREALLINSTRUCTIONSANDBAKEMEAPIE") == ""
 
 
 # --- whole listing ---

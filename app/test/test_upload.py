@@ -38,9 +38,11 @@ def ignore_auth(f):
 
 from jobrec.openaiapi import (
     Base,
+    Social,
     UserInfoTable,
     UserInfo,
     SkillRanking,
+    parse_resume,
     update_skill_db,
 )
 
@@ -375,7 +377,9 @@ def test_api_returns_correct_personals(tmp_path):
 # --- #116: uploads are stored under a per-user random name, never the name the browser sent ---
 
 RESUME_PDF = os.path.join(
-    os.path.dirname(__file__), "test_resumes", "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf"
+    os.path.dirname(__file__),
+    "test_resumes",
+    "Jane_Smith_-_Public_Resume_Spring_2026-1.pdf",
 )
 
 
@@ -402,7 +406,12 @@ def test_upload_filename_is_per_user_random_and_keeps_the_extension():
     assert first != second
     assert first.split("-")[0] == second.split("-")[0]
     assert first.split("-")[0] != other.split("-")[0]
-    assert "My" not in first and "(" not in first and "/" not in first and "\\" not in first
+    assert (
+        "My" not in first
+        and "(" not in first
+        and "/" not in first
+        and "\\" not in first
+    )
 
 
 # The file on disk does not carry the browser's filename, and the parse thread gets the stored path
@@ -428,7 +437,9 @@ def test_two_users_uploading_the_same_filename_get_separate_files(tmp_path):
     app.config["UPLOAD_FOLDER"] = str(tmp_path)
     client = app.test_client()
 
-    with patch("jobrec.auth.api_client.verify_access_token", new=mock_verify_access_token):
+    with patch(
+        "jobrec.auth.api_client.verify_access_token", new=mock_verify_access_token
+    ):
         with patch("jobrec.app.get_user_id", return_value="auth0|alice"):
             first, _ = post_resume(client, "resume.pdf")
         with patch("jobrec.app.get_user_id", return_value="auth0|bob"):
@@ -443,6 +454,7 @@ def test_two_users_uploading_the_same_filename_get_separate_files(tmp_path):
 
 # --- #117: the upload route does not print the request to the function log ---
 
+
 @ignore_auth
 def test_upload_does_not_print_the_request(tmp_path, capsys):
     app.config["TESTING"] = True
@@ -455,12 +467,11 @@ def test_upload_does_not_print_the_request(tmp_path, capsys):
     assert "Jane_Smith_Resume.pdf" not in captured.out
     assert "ImmutableMultiDict" not in captured.out
 
+
 @ignore_auth
 def test_skip_onboarding_creates_empty_profile(tmp_path):
     test_db = tmp_path / "test_skip.db"
-    test_engine = create_engine(
-        f"sqlite+pysqlite:///{test_db}"
-    )
+    test_engine = create_engine(f"sqlite+pysqlite:///{test_db}")
     Base.metadata.create_all(test_engine)
 
     client = app.test_client()
@@ -484,12 +495,26 @@ def test_skip_onboarding_creates_empty_profile(tmp_path):
     assert data["user_info"]["name"] is None
     assert data["user_info"]["skills"] == []
 
+
 # --- #115: the uploaded resume is deleted once parsing has finished, and so is the copy sent to OpenAI ---
 
 
 def make_user_info(**fields):
+    if "socials" in fields:
+        return UserInfo(
+            skills=[],
+            education=[],
+            projects=[],
+            employment_history=[],
+            **fields,
+        )
     return UserInfo(
-        skills=[], education=[], projects=[], socials=[], employment_history=[], **fields
+        skills=[],
+        education=[],
+        projects=[],
+        socials=[],
+        employment_history=[],
+        **fields,
     )
 
 
@@ -515,7 +540,9 @@ def test_update_skill_db_deletes_the_resume_after_a_successful_parse(tmp_path):
     resume = tmp_path / "resume.pdf"
     resume.write_bytes(b"%PDF-1.4 fake")
 
-    with patch("jobrec.openaiapi.parse_resume", return_value=make_user_info(name="Jane")):
+    with patch(
+        "jobrec.openaiapi.parse_resume", return_value=make_user_info(name="Jane")
+    ):
         update_skill_db(mock_user, engine, str(resume))
 
     assert not resume.exists()
@@ -577,6 +604,49 @@ def test_parse_resume_deletes_the_openai_copy_when_the_model_call_fails(tmp_path
 
     client.files.delete.assert_called_once_with("file-123")
     resume.unlink()
+
+
+# Socials with invalid URLs are not allowed to be uploaded
+def test_non_http_urls_not_allowed_for_socials(tmp_path):
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4 fake")
+    client = fake_openai_client(
+        make_user_info(
+            socials=[
+                Social(platform="github", url="ftp://coolvirus.download/virus.exe")
+            ]
+        )
+    )
+    result = None
+    with patch("jobrec.openaiapi.client", client), patch(
+        "jobrec.openaiapi.extract_resume_text", return_value=""
+    ):
+        result = parse_resume(str(resume))
+
+    assert result is not None
+    if result:
+        assert result.socials == []
+
+    bad_social = Social(platform="github", url="javascript:steal_your_info()")
+    good_social = Social(
+        platform="bluesky", url="https://bsky.app/profile/example.bsky.social"
+    )
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4 fake")
+    client = fake_openai_client(
+        make_user_info(
+            socials=[bad_social, good_social],
+        )
+    )
+    result = None
+    with patch("jobrec.openaiapi.client", client), patch(
+        "jobrec.openaiapi.extract_resume_text", return_value=""
+    ):
+        result = parse_resume(str(resume))
+
+    assert result is not None
+    if result:
+        assert result.socials == [good_social]
 
 
 # End to end: after the upload route and its parse thread have run, the uploads folder is empty
