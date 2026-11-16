@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
+import BookmarkButton from "../components/BookmarkButton.jsx";
 import { ClockIcon, DollarIcon, FlagIcon, PinIcon, PushpinIcon } from "../components/Icons.jsx";
 import { compatibilityColor, fetchJob, reportJob } from "../api/jobs.js";
+import { setSaved } from "../api/savedJobs.js";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 import ReportListingModal from "../components/ReportListingModal.jsx";
 
@@ -107,6 +109,13 @@ export default function JobDetail() {
     fetchJob_wrapper();
   }, [id, isLoading, isAuthenticated]);
 
+  // Apply Now opens the posting in a new tab; also add the job to the user's Applied Jobs.
+  const markApplied = () => {
+    getAccessTokenSilently()
+      .then((token) => setSaved("applied", job.id, true, token))
+      .catch((err) => console.error("Couldn't add the job to Applied Jobs", err));
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -169,17 +178,20 @@ export default function JobDetail() {
             <section className="px-12 mt-8">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <h3 className="m-0 text-[36px] font-bold">Role Description</h3>
-                <button
-                  type="button"
-                  disabled={reported}
-                  onClick={() => setReporting(true)}
-                  className={`inline-flex items-center gap-3 text-white text-2xl font-bold rounded-full px-6 py-2 transition-colors ${
-                    reported ? "bg-[#E066A3] cursor-default" : "bg-black hover:bg-[#E066A3]"
-                  }`}
-                >
-                  <FlagIcon className="w-7 h-7" />
-                  {reported ? "Report Listed" : "Report Listing"}
-                </button>
+                <div className="flex flex-col items-end gap-2">
+                  <BookmarkButton jobId={job.id} />
+                  <button
+                    type="button"
+                    disabled={reported}
+                    onClick={() => setReporting(true)}
+                    className={`inline-flex items-center gap-3 text-white text-2xl font-bold rounded-full px-6 py-2 transition-colors ${
+                      reported ? "bg-[#E066A3] cursor-default" : "bg-black hover:bg-[#E066A3]"
+                    }`}
+                  >
+                    <FlagIcon className="w-7 h-7" />
+                    {reported ? "Report Listed" : "Report Listing"}
+                  </button>
+                </div>
               </div>
               <Description text={job.description} />
 
@@ -199,6 +211,7 @@ export default function JobDetail() {
                   href={job.applicationUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={markApplied}
                   className="bg-[#E066A3] hover:bg-[#d4508f] text-white text-[28px] font-bold rounded-3xl px-20 py-4 transition-colors no-underline"
                 >
                   Apply Now

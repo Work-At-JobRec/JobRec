@@ -35,6 +35,13 @@ from docx import Document
 from dotenv import load_dotenv
 import jobrec.auth as auth
 from jobrec.jobs import MAX_JOB_RESULTS, MAX_PAGE_SIZE, get_jobs, get_job
+from jobrec.saved_jobs import (
+    LISTS,
+    get_saved_jobs,
+    is_saved,
+    save_job,
+    unsave_job,
+)
 from jobrec.auth import require_auth, get_user_id
 import importlib
 import logging
@@ -322,6 +329,30 @@ def job_detail_api(job_id: str):
     if job is None:
         return jsonify(error="Job not found"), 404
     return jsonify(job)
+
+
+# The user's saved job lists: /api/bookmarks and /api/applied.
+@app.route("/api/<any(" + ", ".join(LISTS) + "):list_name>")
+@require_auth
+def saved_jobs_api(list_name: str):
+    return jsonify(get_saved_jobs(engine, get_user_id(), list_name))
+
+
+# GET: whether the job is on the list. PUT: add it. DELETE: remove it.
+@app.route(
+    "/api/<any(" + ", ".join(LISTS) + "):list_name>/<job_id>",
+    methods=["GET", "PUT", "DELETE"],
+)
+@require_auth
+def saved_job_api(list_name: str, job_id: str):
+    user_id = get_user_id()
+    if request.method == "PUT":
+        if get_job(job_id, engine, user_id) is None:
+            return jsonify(error="Job not found"), 404
+        save_job(engine, user_id, list_name, job_id)
+    elif request.method == "DELETE":
+        unsave_job(engine, user_id, list_name, job_id)
+    return jsonify(saved=is_saved(engine, user_id, list_name, job_id))
 
 
 def allowed_file(filename):
