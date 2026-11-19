@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import LocationBar from "../components/LocationBar.jsx";
+import BookmarkButton from "../components/BookmarkButton.jsx";
 import { ClockIcon, DollarIcon, FlagIcon, PinIcon, PushpinIcon } from "../components/Icons.jsx";
 import { compatibilityColor, fetchJob, reportJob } from "../api/jobs.js";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
@@ -169,6 +170,9 @@ export default function JobDetail() {
             <section className="px-12 mt-8">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <h3 className="m-0 text-[36px] font-bold">Role Description</h3>
+                <div className="flex flex-col items-end gap-2">
+                  <BookmarkButton jobId={job.id} />
+                </div>
                 <button
                   type="button"
                   disabled={reported}
