@@ -42,9 +42,18 @@ API_FIELDS = {
 def jobs_client(tmp_path, monkeypatch):
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'matching.db'}")
     Base.metadata.create_all(engine)
+    titles = {
+        1: "Echo Role",
+        2: "Zulu Role",
+        3: "Charlie Role",
+        4: "Alpha Role",
+        5: "Bravo Role",
+        6: "Foxtrot Role",
+        7: "Closed Role",
+    }
     fixtures = [
         JobListing(
-            title=f"Role {index}",
+            title=titles[index],
             company_name="Acme",
             location="West Lafayette, IN" if index < 6 else "Chicago, IL",
             description="Build software",
@@ -128,11 +137,57 @@ def test_jobs_api_returns_top_five_ranked_jobs_with_frontend_fields(jobs_client)
         "test-3",
         "test-4",
     ]
+    assert [job["title"] for job in jobs] == [
+        "Zulu Role",
+        "Echo Role",
+        "Bravo Role",
+        "Charlie Role",
+        "Alpha Role",
+    ]
     assert jobs[0]["compatibility"] == 100
     assert jobs[3]["salary"] is None
     assert jobs[4]["compatibility"] == 0
     for job in jobs:
         assert set(job) == API_FIELDS
+
+
+def test_jobs_api_returns_requested_ranked_page(jobs_client):
+    client, headers = jobs_client
+    response = client.get(
+        "/api/jobs?desired_salary=100000&page=2&page_size=2", headers=headers
+    )
+
+    assert response.status_code == 200
+    assert [job["id"] for job in response.get_json()] == ["test-5", "test-3"]
+
+
+def test_jobs_api_prioritizes_compatibility_without_salary_preference(jobs_client):
+    client, headers = jobs_client
+
+    response = client.get("/api/jobs", headers=headers)
+
+    assert response.status_code == 200
+    jobs = response.get_json()
+    assert [job["id"] for job in jobs] == [
+        "test-1",
+        "test-2",
+        "test-3",
+        "test-5",
+        "test-4",
+    ]
+    assert all(job["compatibility"] > 0 for job in jobs[:4])
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["page=0", "page_size=0", "page_size=51", "page=abc"],
+)
+def test_jobs_api_rejects_invalid_pagination(jobs_client, query):
+    client, headers = jobs_client
+
+    response = client.get(f"/api/jobs?{query}", headers=headers)
+
+    assert response.status_code == 400
 
 
 def test_jobs_api_filters_location_without_changing_score(jobs_client):

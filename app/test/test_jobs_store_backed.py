@@ -12,6 +12,7 @@ sys.path.insert(0, SRC_DIR)
 from jobrec.job_listing import JobListing  # noqa: E402
 from jobrec.job_store import (
     get_listing,
+    listing_key,
     list_recent_listings,
     upsert_listings,
 )  # noqa: E402
@@ -22,6 +23,15 @@ from jobrec.jobs import (
     infer_job_type,
     to_api_job,
 )  # noqa: E402
+from jobrec.openaiapi import UserInfoTable  # noqa: E402
+from jobrec.skill_detection import (
+    DiscoveredSkill,
+    SkillConnection,
+    SkillRanking,
+    persist_discovered_skills,
+    store_listing_skills,
+)  # noqa: E402
+from sqlalchemy.orm import Session
 
 API_FIELDS = {
     "id",
@@ -63,6 +73,12 @@ def test_empty_store_serves_the_sample_listings(engine):
 
     assert len(jobs) > 0
     assert all(job["id"].startswith("sample-") for job in jobs)
+
+
+def test_empty_store_sample_listings_are_paginated(engine):
+    jobs = get_jobs(engine, page=2, page_size=2)
+
+    assert [job["id"] for job in jobs] == ["sample-3"]
 
 
 # Without a database at all, the placeholders are served
@@ -316,3 +332,57 @@ def test_list_recent_listings_can_cut_the_description(engine):
         == 50
     )
     assert len(list_recent_listings(engine, limit=10)[0].description) == 1000
+
+
+def test_graph_matching_uses_shortest_path_distance_for_partial_credit(engine):
+    listing = make_listing(source_job_id="graph", title="Rust Engineer")
+    upsert_listings(engine, [listing])
+    persist_discovered_skills(
+        engine,
+        [
+            DiscoveredSkill(skill_name="Python", proficiency_level=4),
+            DiscoveredSkill(
+                skill_name="Go",
+                proficiency_level=3,
+                related_skills=[
+                    SkillConnection(skill_name="Python", distance=0.2)
+                ],
+            ),
+            DiscoveredSkill(
+                skill_name="Rust",
+                proficiency_level=3,
+                related_skills=[SkillConnection(skill_name="Go", distance=0.3)],
+            ),
+            DiscoveredSkill(
+                skill_name="TypeScript",
+                proficiency_level=3,
+                related_skills=[
+                    SkillConnection(skill_name="Python", distance=0.6),
+                    SkillConnection(skill_name="Rust", distance=0.1),
+                ],
+            ),
+        ],
+    )
+    store_listing_skills(
+        engine,
+        {listing_key(listing): [SkillRanking(skill_name="Rust", proficiency_level=4)]},
+    )
+    with Session(engine) as session:
+        session.add(
+            UserInfoTable(
+                user_id="test|graph-user",
+                info={
+                    "skills": [
+                        {"skill_name": "Python", "proficiency_level": 4},
+                        {"skill_name": "Go", "proficiency_level": 1},
+                    ]
+                },
+                done_processing=True,
+            )
+        )
+        session.commit()
+
+    job = get_jobs(engine, user_id="test|graph-user")[0]
+
+    assert job["compatibility"] == 19
+    assert job["requirements"][0]["met"] is False

@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -10,7 +11,9 @@ SRC_DIR = os.path.abspath(
 )
 sys.path.insert(0, SRC_DIR)
 
-from jobrec.link_check import GREENHOUSE_JOB_URL, LinkStatus, check_greenhouse_job, check_job_link, check_link  # noqa: E402
+from jobrec.link_check import (  # noqa: E402
+    ASHBY_JOB_BOARD_URL, GREENHOUSE_JOB_URL, LinkStatus, check_ashby_job, check_greenhouse_job, check_job_link, check_link,
+)
 from link_fakes import FakeSession, page  # noqa: E402
 
 URL = "https://acme.com/jobs/123"
@@ -186,3 +189,93 @@ def test_job_link_without_a_board_reads_only_the_page():
 
     assert check_job_link(URL, session, job_id="123").status == LinkStatus.CLOSED
     assert session.calls == [URL]
+
+
+# --- Ashby posting API (#150): posting pages are rendered in the browser and never carry the title ---
+
+ASHBY_ID = "4c1e8f9a-0b2d-4e6f-8a1b-2c3d4e5f6a7b"
+ASHBY_PAGE = f"https://jobs.ashbyhq.com/acme/{ASHBY_ID}"
+ASHBY_API = ASHBY_JOB_BOARD_URL.format(organization="acme")
+ASHBY_SHELL = "<html><head><title>Jobs</title></head><body><div id='root'></div><script src='app.js'></script></body></html>"
+
+
+def ashby_board(*jobs):
+    return page(200, json.dumps({"jobs": list(jobs)}))
+
+
+def ashby_job(job_id=ASHBY_ID, title="Software Engineer", **fields):
+    return {"id": job_id, "title": title, "descriptionPlain": "Build the product.", "isListed": True, **fields}
+
+
+# A posting the board still lists is open, and its title stands in for the page text
+def test_ashby_posting_on_the_board_is_open():
+    result = check_ashby_job("acme", ASHBY_ID, FakeSession({ASHBY_API: ashby_board(ashby_job())}))
+
+    assert result.status == LinkStatus.OPEN
+    assert result.http_status == 200
+    assert "Software Engineer" in result.text
+    assert "Software Engineer" in result.raw
+
+
+# A posting the board no longer lists, or lists as unlisted, is closed
+@pytest.mark.parametrize("jobs", [
+    [ashby_job(job_id="11111111-2222-3333-4444-555555555555", title="Other Job")],
+    [ashby_job(isListed=False)],
+])
+def test_ashby_posting_missing_or_unlisted_is_closed(jobs):
+    assert check_ashby_job("acme", ASHBY_ID, FakeSession({ASHBY_API: ashby_board(*jobs)})).status == LinkStatus.CLOSED
+
+
+# Anything inconclusive stays unknown, including an empty board, so pruning never deletes on it
+@pytest.mark.parametrize("outcome", [
+    page(404, "Not found"),
+    page(500, "error"),
+    page(200, "<html>not json</html>"),
+    page(200, '{"jobs": []}'),
+    page(200, '{"error": "unknown board"}'),
+    requests.Timeout("timed out"),
+])
+def test_ashby_api_failures_are_unknown(outcome):
+    assert check_ashby_job("acme", ASHBY_ID, FakeSession({ASHBY_API: outcome})).status == LinkStatus.UNKNOWN
+
+
+# One board request answers every posting of that organization in a run
+def test_ashby_board_is_fetched_once_per_organization():
+    other_id = "11111111-2222-3333-4444-555555555555"
+    session = FakeSession({ASHBY_API: ashby_board(ashby_job(), ashby_job(job_id=other_id, title="Designer"))})
+    boards = {}
+
+    first = check_ashby_job("acme", ASHBY_ID, session, boards=boards)
+    second = check_ashby_job("acme", other_id, session, boards=boards)
+
+    assert (first.status, second.status) == (LinkStatus.OPEN, LinkStatus.OPEN)
+    assert "Designer" in second.text
+    assert session.calls == [ASHBY_API]
+
+
+# check_job_link recognises an Ashby posting link and asks the API instead of reading the shell page
+def test_job_link_checks_ashby_postings_through_the_api():
+    session = FakeSession({ASHBY_API: ashby_board(ashby_job()), ASHBY_PAGE: page(200, ASHBY_SHELL)})
+
+    result = check_job_link(ASHBY_PAGE, session, job_id=ASHBY_ID)
+
+    assert result.status == LinkStatus.OPEN
+    assert "Software Engineer" in result.raw
+    assert session.calls == [ASHBY_API]
+
+
+def test_ashby_job_link_falls_back_to_the_page_when_the_api_is_inconclusive():
+    session = FakeSession({ASHBY_API: requests.Timeout("timed out"), ASHBY_PAGE: page(404, "Not found")})
+
+    result = check_job_link(ASHBY_PAGE, session, job_id=ASHBY_ID)
+
+    assert result.status == LinkStatus.CLOSED
+    assert session.calls == [ASHBY_API, ASHBY_PAGE]
+
+
+# The posting id is read from the link when the listing has none stored
+def test_ashby_job_id_is_taken_from_the_link():
+    session = FakeSession({ASHBY_API: ashby_board(ashby_job())})
+
+    assert check_job_link(ASHBY_PAGE + "/application", session).status == LinkStatus.OPEN
+    assert session.calls == [ASHBY_API]

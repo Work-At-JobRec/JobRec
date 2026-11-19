@@ -96,15 +96,18 @@ def build_scraper(source: JobSource) -> BaseScraper:
 
 
 def scrape_all(
-    engine: Engine, sources: list[JobSource]
+    engine: Engine, sources: list[JobSource], max_listings: Optional[int] = None
 ) -> list[tuple[str, UpsertResult]]:
-    """Scrape every enabled source into the database, returning (source name, result) per source in order."""
+    """Scrape every enabled source into the database, returning (source name, result) per source in order.
+
+    ``max_listings`` caps how many listings each source stores.
+    """
     results: list[tuple[str, UpsertResult]] = []
     for source in sources:
         if not source.enabled:
             logger.info("Skipping disabled source %s", source.name)
             continue
-        result = run_scrape_pipeline(engine, [build_scraper(source)])
+        result = run_scrape_pipeline(engine, [build_scraper(source)], max_listings=max_listings)
         logger.info(
             "Source %s: %d new, %d updated, %d unchanged",
             source.name,
