@@ -11,7 +11,7 @@ export default function JobListLinks() {
       <button type="button" aria-disabled="true" title="Coming soon" className={buttonClass}>
         Applied Jobs
       </button>
-      <Link to="/bookmarks" target="_blank" rel="noopener noreferrer" className={buttonClass}>
+      <Link to="/bookmarks" rel="noopener noreferrer" replace className={buttonClass}>
         Bookmarks
       </Link>
     </div>
