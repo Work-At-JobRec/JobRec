@@ -8,8 +8,6 @@ from flask import (
     flash,
     request,
     redirect,
-    render_template,
-    url_for,
     jsonify,
     Response,
 )
@@ -22,9 +20,7 @@ from jobrec.openaiapi import (
     update_user_info,
 )
 from jobrec.job_store import (
-    JobListingTable,
     count_finalized_listings,
-    count_listings,
     ensure_job_listing_schema,
 )
 from threading import Thread
@@ -33,7 +29,6 @@ import uuid
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
-import jobrec.auth as auth
 from jobrec.jobs import get_jobs, get_job
 from jobrec.saved_jobs import (
     LISTS,
@@ -41,6 +36,7 @@ from jobrec.saved_jobs import (
     is_saved,
     save_job,
     unsave_job,
+)
 from jobrec.bookmarks import (
     add_bookmark,
     get_bookmarked_jobs,
