@@ -1,20 +1,26 @@
 """Dynamic skill catalog and structured skill detection for resumes and listings."""
 
 import logging
+import math
+import re
+from collections import Counter
 from enum import Enum
 from pathlib import Path
 from typing import cast
 
 from openai import OpenAI
 from pydantic import BaseModel, Field, create_model
-from sqlalchemy import ForeignKey, Integer, String, select
+from sqlalchemy import Float, ForeignKey, Integer, String, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from jobrec.db import Base
-from jobrec.job_store import JobListingTable
+from jobrec.job_store import JobListingTable, ensure_job_listing_schema
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SKILL_CANDIDATE_CAP = 100
+_TOKEN_PATTERN = re.compile(r"\.net|c\+\+|c#|[a-z0-9]+", re.IGNORECASE)
 
 
 class SkillRanking(BaseModel):
@@ -36,6 +42,13 @@ class _ConstrainedSkillResult(BaseModel):
     skills: list[_CatalogSkillRanking]
 
 
+class SkillConnection(BaseModel):
+    skill_name: str = Field(..., description="Canonical name of an existing skill")
+    distance: float = Field(
+        ..., gt=0, le=1, description="Semantic distance to the existing skill"
+    )
+
+
 class DiscoveredSkill(BaseModel):
     skill_name: str = Field(..., description="Name of a genuinely new skill")
     proficiency_level: int = Field(
@@ -44,6 +57,7 @@ class DiscoveredSkill(BaseModel):
         le=4,
         description="Proficiency or requirement level from 1 (basic) to 4 (expert)",
     )
+    related_skills: list[SkillConnection] = Field(default_factory=list, max_length=5)
 
 
 class UnconstrainedSkillResult(BaseModel):
@@ -58,6 +72,18 @@ class CanonicalSkillTable(Base):
         String(255), unique=True, nullable=False
     )
     skill_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class SkillConnectionTable(Base):
+    __tablename__ = "canonical_skill_connections"
+
+    skill_a_id: Mapped[int] = mapped_column(
+        ForeignKey("canonical_skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    skill_b_id: Mapped[int] = mapped_column(
+        ForeignKey("canonical_skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    distance: Mapped[float] = mapped_column(Float, nullable=False)
 
 
 class ListingSkillTable(Base):
@@ -84,6 +110,62 @@ def _openai_client() -> OpenAI:
 
 def _normalized_name(name: str) -> str:
     return " ".join(name.strip().casefold().split())
+
+
+def _search_tokens(text: str) -> list[str]:
+    return [token.casefold() for token in _TOKEN_PATTERN.findall(text)]
+
+
+def retrieve_skill_candidates(
+    document_text: str, catalog: list[str], *, limit: int = DEFAULT_SKILL_CANDIDATE_CAP
+) -> list[str]:
+    """Rank catalog names against a document with BM25 and return the top matches."""
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+
+    query_terms = set(_search_tokens(document_text))
+    if not query_terms or not catalog:
+        return []
+
+    unique_names = list(dict.fromkeys(name for name in catalog if name.strip()))
+    tokenized = [(name, _search_tokens(name)) for name in unique_names]
+    document_frequency = Counter(
+        token for _, tokens in tokenized for token in set(tokens)
+    )
+    average_length = (
+        sum(len(tokens) for _, tokens in tokenized) / len(tokenized)
+        if tokenized
+        else 0.0
+    )
+    if not average_length:
+        return []
+
+    document_count = len(tokenized)
+    k1 = 1.5
+    b = 0.75
+    scored: list[tuple[float, int, str]] = []
+    for index, (name, tokens) in enumerate(tokenized):
+        term_frequency = Counter(tokens)
+        length_normalizer = k1 * (1 - b + b * len(tokens) / average_length)
+        score = 0.0
+        for term in query_terms.intersection(term_frequency):
+            frequency = term_frequency[term]
+            inverse_frequency = math.log(
+                1
+                + (document_count - document_frequency[term] + 0.5)
+                / (document_frequency[term] + 0.5)
+            )
+            score += (
+                inverse_frequency
+                * frequency
+                * (k1 + 1)
+                / (frequency + length_normalizer)
+            )
+        if score:
+            scored.append((score, index, name))
+
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return [name for _, _, name in scored[:limit]]
 
 
 def _constrained_result_model(
@@ -124,7 +206,7 @@ def _constrained_result_model(
 
 
 def initialize_skill_schema(engine: Engine) -> None:
-    Base.metadata.create_all(engine)
+    ensure_job_listing_schema(engine)
 
 
 def get_skill_catalog(engine: Engine) -> list[str]:
@@ -141,17 +223,49 @@ def persist_discovered_skills(engine: Engine, skills: list[DiscoveredSkill]) -> 
         return
     initialize_skill_schema(engine)
     with Session(engine) as session:
-        existing = set(session.scalars(select(CanonicalSkillTable.normalized_name)))
-        for skill in skills:
-            normalized = _normalized_name(skill.skill_name)
-            if normalized and normalized not in existing:
-                session.add(
-                    CanonicalSkillTable(
-                        normalized_name=normalized, skill_name=skill.skill_name.strip()
-                    )
-                )
-                existing.add(normalized)
+        _persist_discovered_skills(session, skills)
         session.commit()
+
+
+def _persist_discovered_skills(session: Session, skills: list[DiscoveredSkill]) -> None:
+    catalog = {
+        row.normalized_name: row
+        for row in session.scalars(select(CanonicalSkillTable))
+    }
+    for skill in skills:
+        normalized = _normalized_name(skill.skill_name)
+        if normalized and normalized not in catalog:
+            row = CanonicalSkillTable(
+                normalized_name=normalized, skill_name=skill.skill_name.strip()
+            )
+            session.add(row)
+            catalog[normalized] = row
+
+    session.flush()
+    existing_connections = {
+        (row.skill_a_id, row.skill_b_id): row
+        for row in session.scalars(select(SkillConnectionTable))
+    }
+    for skill in skills:
+        source = catalog.get(_normalized_name(skill.skill_name))
+        if source is None:
+            continue
+        for connection in skill.related_skills:
+            target = catalog.get(_normalized_name(connection.skill_name))
+            if target is None or target.id == source.id:
+                continue
+            edge_key = (min(source.id, target.id), max(source.id, target.id))
+            existing = existing_connections.get(edge_key)
+            if existing is None:
+                existing = SkillConnectionTable(
+                    skill_a_id=edge_key[0],
+                    skill_b_id=edge_key[1],
+                    distance=connection.distance,
+                )
+                session.add(existing)
+                existing_connections[edge_key] = existing
+            else:
+                existing.distance = min(existing.distance, connection.distance)
 
 
 def detect_document_skills(
@@ -159,22 +273,36 @@ def detect_document_skills(
     catalog: list[str],
     *,
     document_type: str,
+    candidate_cap: int = DEFAULT_SKILL_CANDIDATE_CAP,
 ) -> tuple[list[SkillRanking], list[DiscoveredSkill]]:
-    """Run catalog-constrained detection followed by discovery of missing skills."""
+    """Detect catalog matches, then discover novel skills.
+
+    A non-empty catalog requires two Responses API requests per document; an
+    empty catalog skips the constrained request and requires one.
+    """
     if not document_text.strip():
         return [], []
+    if candidate_cap < 1:
+        raise ValueError("candidate_cap must be at least 1")
 
     catalog_by_name = {_normalized_name(item): item for item in catalog}
+    candidates = retrieve_skill_candidates(document_text, catalog, limit=candidate_cap)
+    logger.info(
+        "Skill candidate retrieval: %d of %d catalog entries (cap=%d)",
+        len(candidates),
+        len(catalog_by_name),
+        candidate_cap,
+    )
     client = _openai_client()
     matched: dict[str, SkillRanking] = {}
-    constrained_model = _constrained_result_model(catalog)
+    constrained_model = _constrained_result_model(candidates)
     if constrained_model is not None:
         constrained_response = client.responses.parse(
             model="gpt-5.2",
             instructions=(
                 f"Identify skills explicitly evidenced or required by this {document_type}. "
-                "Select only skills from the supplied canonical catalog. Do not infer a skill "
-                "from a job title alone. For resumes, rate demonstrated proficiency: 1 is "
+                "Select only skills from the supplied canonical catalog."
+                "For resumes, rate demonstrated proficiency: 1 is "
                 "basic familiarity, 2 is extensive amateur experience, 3 is professional or "
                 "academic experience, and 4 is proven long-term mastery. For listings, rate "
                 "the required proficiency using the same scale. Return an empty list when none match."
@@ -182,14 +310,15 @@ def detect_document_skills(
             input=[
                 {
                     "role": "user",
-                    "content": (
-                        f"Canonical skill catalog: {catalog!r}\n\n"
-                        f"Document:\n{document_text}"
-                    ),
+                    "content": (f"Document:\n{document_text}"),
                 }
             ],
             text_format=constrained_model,
         )
+        if constrained_response.usage is not None:
+            logger.info(
+                f"constrained response used {constrained_response.usage.total_tokens} tokens"
+            )
         constrained = constrained_response.output_parsed
     else:
         constrained = None
@@ -210,26 +339,37 @@ def detect_document_skills(
             ):
                 matched[normalized] = ranking
 
-    unconstrained = client.responses.parse(
+    unconstrained_response = client.responses.parse(
         model="gpt-5.2",
         instructions=(
             f"Find skills genuinely evidenced or required by this {document_type} that are "
             "missing from the already matched skill list. Do not return any catalog skill, "
             "synonym, alternate spelling, or a narrower/broader version of an existing skill. "
-            "Do not infer skills from a title alone. Include a concise broad category and rate "
-            "proficiency/requirement from 1 (basic) to 4 (expert). Return an empty list if none."
+            "Do not infer skills from a title alone. Rate proficiency/requirement from 1 "
+            "(basic) to 4 (expert). For each new skill, optionally connect it to at most five "
+            "closely related existing catalog skills listed in the input. Use the exact catalog "
+            "name and estimate distance from 0.01 (very close) to 1.0 (loosely related); "
+            "smaller distances mean stronger relationships. Do not connect a skill to itself. "
+            "Return an empty list if no new skills are found."
         ),
         input=[
             {
                 "role": "user",
                 "content": (
                     f"Already matched canonical skills: {list(matched.values())!r}\n\n"
+                    f"Existing catalog skills available for graph connections: {candidates!r}\n\n"
                     f"Original document:\n{document_text}"
                 ),
             }
         ],
         text_format=UnconstrainedSkillResult,
-    ).output_parsed
+    )
+
+    unconstrained = unconstrained_response.output_parsed
+    if unconstrained_response.usage is not None:
+        logger.info(
+            f"unconstrained response used {unconstrained_response.usage.total_tokens} tokens"
+        )
 
     discovered: dict[str, DiscoveredSkill] = {}
     if unconstrained is not None:
@@ -237,10 +377,24 @@ def detect_document_skills(
             normalized = _normalized_name(skill.skill_name)
             if not normalized or normalized in catalog_by_name or normalized in matched:
                 continue
+            related_skills: dict[str, SkillConnection] = {}
+            for connection in skill.related_skills:
+                target = catalog_by_name.get(_normalized_name(connection.skill_name))
+                target_normalized = _normalized_name(target) if target else ""
+                if target is None or target_normalized == normalized:
+                    continue
+                previous = related_skills.get(target_normalized)
+                if previous is None or connection.distance < previous.distance:
+                    related_skills[target_normalized] = SkillConnection(
+                        skill_name=target, distance=connection.distance
+                    )
             ranking = discovered.get(normalized)
             if ranking is None or skill.proficiency_level > ranking.proficiency_level:
                 discovered[normalized] = skill.model_copy(
-                    update={"skill_name": " ".join(skill.skill_name.strip().split())}
+                    update={
+                        "skill_name": " ".join(skill.skill_name.strip().split()),
+                        "related_skills": list(related_skills.values()),
+                    }
                 )
 
     return list(matched.values()), list(discovered.values())
@@ -271,31 +425,81 @@ def store_listing_skills(
         return
     initialize_skill_schema(engine)
     with Session(engine) as session:
-        listings = {
-            row.dedupe_key: row
-            for row in session.scalars(
-                select(JobListingTable).where(
-                    JobListingTable.dedupe_key.in_(skills_by_key)
-                )
-            )
-        }
-        catalog = {
-            row.normalized_name: row
-            for row in session.scalars(select(CanonicalSkillTable))
-        }
-        for key, rankings in skills_by_key.items():
-            listing = listings.get(key)
-            if listing is None:
-                continue
-            session.query(ListingSkillTable).filter_by(listing_id=listing.id).delete()
-            for ranking in rankings:
-                skill = catalog.get(_normalized_name(ranking.skill_name))
-                if skill is not None:
-                    session.add(
-                        ListingSkillTable(
-                            listing_id=listing.id,
-                            skill_id=skill.id,
-                            proficiency_level=ranking.proficiency_level,
-                        )
-                    )
+        _store_listing_skills(session, skills_by_key)
         session.commit()
+
+
+def _store_listing_skills(
+    session: Session,
+    skills_by_key: dict[str, list[SkillRanking]],
+) -> None:
+    listings = {
+        row.dedupe_key: row
+        for row in session.scalars(
+            select(JobListingTable).where(JobListingTable.dedupe_key.in_(skills_by_key))
+        )
+    }
+    catalog = {
+        row.normalized_name: row for row in session.scalars(select(CanonicalSkillTable))
+    }
+    for key, rankings in skills_by_key.items():
+        listing = listings.get(key)
+        if listing is None:
+            continue
+        session.query(ListingSkillTable).filter_by(listing_id=listing.id).delete()
+        for ranking in rankings:
+            skill = catalog.get(_normalized_name(ranking.skill_name))
+            if skill is not None:
+                session.add(
+                    ListingSkillTable(
+                        listing_id=listing.id,
+                        skill_id=skill.id,
+                        proficiency_level=ranking.proficiency_level,
+                    )
+                )
+
+
+def save_listing_skill_analysis(
+    engine: Engine,
+    dedupe_key: str,
+    description: str,
+    matched: list[SkillRanking],
+    discovered: list[DiscoveredSkill],
+) -> bool:
+    """Persist a result only if it still matches the listing's current description."""
+    initialize_skill_schema(engine)
+    with Session(engine) as session:
+        listing = session.scalar(
+            select(JobListingTable).where(
+                JobListingTable.dedupe_key == dedupe_key,
+                JobListingTable.skills_pending.is_(True),
+            )
+        )
+        if listing is None or listing.description != description:
+            return False
+
+        _persist_discovered_skills(session, discovered)
+        session.flush()
+        updated = session.execute(
+            update(JobListingTable)
+            .where(
+                JobListingTable.id == listing.id,
+                JobListingTable.description == description,
+                JobListingTable.skills_pending.is_(True),
+            )
+            .values(skills_pending=False)
+        )
+        if updated.rowcount != 1:
+            session.rollback()
+            return False
+
+        rankings = matched + [
+            SkillRanking(
+                skill_name=skill.skill_name,
+                proficiency_level=skill.proficiency_level,
+            )
+            for skill in discovered
+        ]
+        _store_listing_skills(session, {dedupe_key: rankings})
+        session.commit()
+        return True

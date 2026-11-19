@@ -1,6 +1,5 @@
 import os
 import sys
-from threading import Event
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -13,16 +12,20 @@ sys.path.insert(0, SRC_DIR)
 from jobrec.db import Base  # noqa: E402
 from jobrec.job_listing import JobListing  # noqa: E402
 from jobrec.job_store import (
+    JobListingTable,
     UpsertResult,
     count_listings,
     list_listings,
 )  # noqa: E402
+from jobrec.listing_skill_extractor import extract_pending_listing_skills  # noqa: E402
 from jobrec.scrape_pipeline import run_scrape_pipeline  # noqa: E402
 from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
 from jobrec.skill_detection import (  # noqa: E402
     CanonicalSkillTable,
     DiscoveredSkill,
     ListingSkillTable,
+    SkillRanking,
+    save_listing_skill_analysis,
 )
 
 
@@ -71,7 +74,7 @@ def raw_listing(**overrides) -> JobListing:
     return JobListing(**fields)
 
 
-# Scraped listings are cleaned, checked, and stored in one step
+# Scraped listings are cleaned, checked, stored, and marked for deferred extraction
 def test_pipeline_normalizes_validates_and_stores(engine):
     scraper = FixedScraper([raw_listing(), raw_listing(title="", source_job_id="2")])
 
@@ -83,6 +86,8 @@ def test_pipeline_normalizes_validates_and_stores(engine):
     assert stored.title == "Software Engineer"
     assert stored.description == "Build things."
     assert stored.application_url == "https://acme.com/jobs/1"
+    with Session(engine) as session:
+        assert session.scalar(select(JobListingTable.skills_pending)) is True
 
 
 # Running the pipeline again over the same source adds nothing new
@@ -118,37 +123,73 @@ def test_pipeline_does_not_store_closed_listings(engine):
     assert [job.source_job_id for job in list_listings(engine)] == ["1"]
 
 
-def test_listing_skill_detection_overlaps_scraping_and_persists_results(
+def test_scrape_pipeline_does_not_call_skill_detector(engine, monkeypatch):
+    def unexpected_detection(*args, **kwargs):
+        pytest.fail("scraping must not call the OpenAI skill detector")
+
+    monkeypatch.setattr(
+        "jobrec.skill_detection.detect_document_skills", unexpected_detection
+    )
+
+    result = run_scrape_pipeline(engine, [FixedScraper([raw_listing()])])
+
+    assert result.inserted == 1
+    with Session(engine) as session:
+        assert session.scalar(select(JobListingTable.skills_pending)) is True
+
+
+def test_description_updates_requeue_skill_extraction(engine):
+    original = raw_listing()
+    run_scrape_pipeline(engine, [FixedScraper([original])])
+    key = "fixed:id:1"
+    assert save_listing_skill_analysis(
+        engine,
+        key,
+        "Build things.",
+        [SkillRanking(skill_name="Python", proficiency_level=3)],
+        [],
+    )
+
+    run_scrape_pipeline(
+        engine,
+        [FixedScraper([raw_listing(title="Senior Engineer")])],
+    )
+    with Session(engine) as session:
+        assert session.scalar(select(JobListingTable.skills_pending)) is False
+
+    run_scrape_pipeline(
+        engine,
+        [FixedScraper([raw_listing(description="<p>Build different things.</p>")])],
+    )
+    with Session(engine) as session:
+        assert session.scalar(select(JobListingTable.skills_pending)) is True
+
+
+def test_pending_skill_extractor_saves_results_and_skips_completed_listings(
     engine, monkeypatch
 ):
-    detector_started = Event()
+    run_scrape_pipeline(engine, [FixedScraper([raw_listing()])])
+    calls = []
 
-    def detect_skills(document_text, catalog, *, document_type):
-        detector_started.set()
+    def detect_skills(
+        document_text, catalog, *, document_type, candidate_cap
+    ):
+        calls.append((document_text, document_type))
         return [], [
             DiscoveredSkill(
                 skill_name="Novel Framework",
-                category="Software Engineering",
                 proficiency_level=3,
             )
         ]
 
-    class DetectionAwareScraper(FixedScraper):
-        source_name = "second"
-
-        def fetch_jobs(self):
-            assert detector_started.wait(timeout=2)
-            return [raw_listing(source="second", source_job_id="2")]
-
-    monkeypatch.setattr("jobrec.skill_detection.detect_document_skills", detect_skills)
-    first_listing = raw_listing()
-
-    result = run_scrape_pipeline(
-        engine,
-        [FixedScraper([first_listing]), DetectionAwareScraper([])],
+    monkeypatch.setattr(
+        "jobrec.listing_skill_extractor.detect_document_skills", detect_skills
     )
+    result = extract_pending_listing_skills(engine, limit=10)
 
-    assert result.inserted == 2
+    assert result.processed == 1
+    assert result.failed == result.stale == result.pending == 0
+    assert calls == [("Build things.", "job listing")]
     with Session(engine) as session:
         skill = session.scalars(
             select(CanonicalSkillTable).where(
@@ -156,6 +197,67 @@ def test_listing_skill_detection_overlaps_scraping_and_persists_results(
             )
         ).one()
         associations = list(session.scalars(select(ListingSkillTable)))
-    assert len(associations) == 2
-    assert {association.skill_id for association in associations} == {skill.id}
-    assert {association.proficiency_level for association in associations} == {3}
+    assert len(associations) == 1
+    assert associations[0].skill_id == skill.id
+    assert associations[0].proficiency_level == 3
+
+    result = extract_pending_listing_skills(engine, limit=10)
+
+    assert result.processed == result.failed == result.stale == result.pending == 0
+    assert len(calls) == 1
+
+
+def test_pending_skill_extractor_respects_limit(engine, monkeypatch):
+    run_scrape_pipeline(
+        engine,
+        [
+            FixedScraper(
+                [
+                    raw_listing(source_job_id="1"),
+                    raw_listing(source_job_id="2"),
+                ]
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "jobrec.listing_skill_extractor.detect_document_skills",
+        lambda *args, **kwargs: ([], []),
+    )
+
+    result = extract_pending_listing_skills(engine, limit=1)
+
+    assert result.processed == 1
+    assert result.pending == 1
+
+
+def test_pending_skill_extractor_passes_candidate_cap(engine, monkeypatch):
+    run_scrape_pipeline(engine, [FixedScraper([raw_listing()])])
+    received = []
+
+    def detect_skills(document_text, catalog, *, document_type, candidate_cap):
+        received.append(candidate_cap)
+        return [], []
+
+    monkeypatch.setattr(
+        "jobrec.listing_skill_extractor.detect_document_skills", detect_skills
+    )
+
+    extract_pending_listing_skills(engine, limit=1, candidate_cap=25)
+
+    assert received == [25]
+
+
+def test_failed_skill_extraction_remains_pending(engine, monkeypatch):
+    run_scrape_pipeline(engine, [FixedScraper([raw_listing()])])
+
+    def fail_detection(*args, **kwargs):
+        raise RuntimeError("API unavailable")
+
+    monkeypatch.setattr(
+        "jobrec.listing_skill_extractor.detect_document_skills", fail_detection
+    )
+
+    result = extract_pending_listing_skills(engine, limit=1)
+
+    assert result.failed == 1
+    assert result.pending == 1

@@ -26,6 +26,10 @@ DEFAULT_TIMEOUT = 10
 DEFAULT_MAX_BYTES = 200_000
 # Greenhouse's public job board API answers for one job: 200 with the job, 404 when it is gone.
 GREENHOUSE_JOB_URL = "https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs/{job_id}"
+# Ashby's public posting API lists every open posting of an organization in one answer.
+ASHBY_JOB_BOARD_URL = "https://api.ashbyhq.com/posting-api/job-board/{organization}"
+# Ashby posting pages live at jobs.ashbyhq.com/{organization}/{posting id}[/application].
+ASHBY_PAGE_HOST = "jobs.ashbyhq.com"
 
 # Status codes that mean the page itself no longer exists.
 _GONE_STATUSES = (404, 410)
@@ -164,6 +168,73 @@ def check_greenhouse_job(
         response.close()
 
 
+def _fetch_ashby_board(organization: str, session, timeout: float):
+    """An Ashby organization's postings keyed by lower-cased id, or a LinkResult saying why they could not be read."""
+    url = ASHBY_JOB_BOARD_URL.format(organization=organization)
+    try:
+        response = session.get(url, timeout=timeout, headers={"User-Agent": USER_AGENT})
+    except requests.RequestException as exc:
+        return LinkResult(LinkStatus.UNKNOWN, f"Ashby API request failed: {exc}")
+
+    try:
+        status = response.status_code
+        if status != 200:
+            return LinkResult(LinkStatus.UNKNOWN, f"Ashby API: HTTP {status}", status, url)
+        try:
+            data = response.json()
+        except ValueError:
+            return LinkResult(LinkStatus.UNKNOWN, "Ashby API: response is not JSON", status, url)
+        jobs = data.get("jobs") if isinstance(data, dict) else None
+        # An empty board is not taken as proof that every posting closed; the page can still say.
+        if not isinstance(jobs, list) or not jobs:
+            return LinkResult(LinkStatus.UNKNOWN, "Ashby API: board lists no postings", status, url)
+        return {str(job.get("id")).lower(): job for job in jobs if isinstance(job, dict)}
+    finally:
+        response.close()
+
+
+def check_ashby_job(
+    organization: str, job_id: str, session, timeout: float = DEFAULT_TIMEOUT, boards: Optional[dict] = None,
+) -> LinkResult:
+    """Ask Ashby's posting API whether a posting is still listed, without touching its page.
+
+    Ashby posting pages are rendered in the browser, so the HTML a request receives is a
+    shell that never names the job (#150). The board answers for every posting of the
+    organization at once, so ``boards`` keeps each organization's answer for the rest of
+    the run. A posting the board lists is OPEN, one it no longer lists (or lists as
+    unlisted) is CLOSED, and a board that could not be read is UNKNOWN.
+    """
+    organization = organization.strip().lower()
+    if boards is None:
+        boards = {}
+    if organization not in boards:
+        boards[organization] = _fetch_ashby_board(organization, session, timeout)
+    board = boards[organization]
+    if isinstance(board, LinkResult):
+        return board
+
+    url = ASHBY_JOB_BOARD_URL.format(organization=organization)
+    job = board.get(str(job_id).strip().lower())
+    if job is None:
+        return LinkResult(LinkStatus.CLOSED, "Ashby API: posting no longer listed", 200, url)
+    if job.get("isListed") is False:
+        return LinkResult(LinkStatus.CLOSED, "Ashby API: posting is unlisted", 200, url)
+    # As for Greenhouse, the posting's title and description stand in for the page text.
+    text = clean_text(f"{job.get('title') or ''}\n{job.get('descriptionPlain') or job.get('descriptionHtml') or ''}")
+    return LinkResult(LinkStatus.OPEN, "Ashby API: posting is listed", 200, url, text, json.dumps(job, ensure_ascii=False))
+
+
+def _ashby_posting(url: str) -> Optional[tuple[str, str]]:
+    """The (organization, posting id) an Ashby posting link points at, or None for any other link."""
+    parts = urlsplit(url or "")
+    if (parts.hostname or "").lower() != ASHBY_PAGE_HOST:
+        return None
+    segments = [segment for segment in parts.path.split("/") if segment]
+    if len(segments) < 2:
+        return None
+    return segments[0], segments[1]
+
+
 def check_job_link(
     url: str,
     session,
@@ -171,14 +242,23 @@ def check_job_link(
     job_id: Optional[str] = None,
     board_token: Optional[str] = None,
     max_bytes: int = DEFAULT_MAX_BYTES,
+    ashby_boards: Optional[dict] = None,
 ) -> LinkResult:
-    """Judge a stored listing's status: through the Greenhouse API when the board is known, else from its page.
+    """Judge a stored listing's status: through the Greenhouse or Ashby API when it can, else from its page.
 
     The page is only requested when there is no board to ask or the API could not say.
+    Pass the same ``ashby_boards`` dict for a whole run so each Ashby board is read once.
     """
     if board_token and job_id:
         result = check_greenhouse_job(board_token, job_id, session, timeout=timeout)
         if result.status is not LinkStatus.UNKNOWN:
             return result
         logger.info("Greenhouse API could not settle %s (%s); reading the page instead", url, result.reason)
+    ashby = _ashby_posting(url)
+    if ashby:
+        organization, posting_id = ashby
+        result = check_ashby_job(organization, job_id or posting_id, session, timeout=timeout, boards=ashby_boards)
+        if result.status is not LinkStatus.UNKNOWN:
+            return result
+        logger.info("Ashby API could not settle %s (%s); reading the page instead", url, result.reason)
     return check_link(url, session, timeout=timeout, job_id=job_id, max_bytes=max_bytes)
