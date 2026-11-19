@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar.jsx";
 import Avatar from "../components/Avatar.jsx";
 import MenuItem from "../components/MenuItem.jsx";
+import { EditIcon } from "../components/Icons.jsx";
+import EditProfileModal from "../components/EditProfileModal.jsx";
 import { useAuthenticatedUser } from "../hooks/useAuthenticatedUser.ts";
 import { useNavigate } from "react-router-dom";
 
@@ -9,7 +11,19 @@ const PLACEHOLDER_CONTACT = {
   name: null,
   email: null,
   phone: null,
-  address: null,
+  location: null,
+};
+
+const EMPTY_PROFILE = {
+  name: null,
+  email: null,
+  phone: null,
+  location: null,
+  skills: [],
+  education: [],
+  projects: [],
+  socials: [],
+  employment_history: [],
 };
 
 // The backend doesn't report parsing progress, so estimate it: ease toward 95% and
@@ -41,6 +55,7 @@ function LeftPanel({
   selectedFile,
   onFileChange,
   uploadError,
+  onEditProfile,
 }) {
   const contact = userInfo ?? PLACEHOLDER_CONTACT;
 
@@ -49,14 +64,28 @@ function LeftPanel({
       {/* Center within one viewport height (minus navbar and padding) rather than the whole
           section, so the panel doesn't drift down when the right panel grows after parsing */}
       <div className="flex flex-col justify-center md:min-h-[calc(100vh-58px-74px)]">
-      <h1 className="m-0 mb-6 text-[30px] font-bold">Your Profile</h1>
+      <h1 className="m-0 mb-6 text-[30px] font-bold">
+        {processing ? (
+          "Your Profile:"
+        ) : (
+          <button
+            type="button"
+            onClick={() => onEditProfile("profile")}
+            title="Edit profile"
+            className="inline-flex items-center gap-3 text-black hover:text-[#E75A8F] transition-colors cursor-pointer"
+          >
+            <EditIcon className="w-8 h-8" />
+            Your Profile:
+          </button>
+        )}
+      </h1>
       {contact.name && <p className="m-0 text-2xl font-bold">{contact.name}</p>}
       {contact.email && <p className="m-0 mt-1 text-2xl font-bold">{contact.email}</p>}
       {contact.phone && <p className="m-0 mt-1 text-2xl font-bold">{contact.phone}</p>}
-      {contact.address && (
+      {contact.location && (
         <div className="mt-2.5 text-[#9b9b9b] text-[17px] inline-flex items-center justify-center gap-1.5">
           <span>📍</span>
-          <span>{contact.address}</span>
+          <span>{contact.location}</span>
         </div>
       )}
 
@@ -143,23 +172,16 @@ function LeftPanel({
 
 const SKILL_PREVIEW_COUNT = 5;
 
-function SkillChips({ skills, onRemoveSkill }) {
+// Read-only chips; skills are added and removed in the edit pop-up
+function SkillChips({ skills }) {
   return (
     <div className="flex flex-wrap gap-2">
       {skills.map((skill) => (
         <span
           key={skill.skill_name}
-          className="inline-flex items-center gap-1.5 border-2 border-[#E75A8F] rounded-full py-1 pl-3 pr-2 text-base"
+          className="inline-flex items-center border-2 border-[#E75A8F] rounded-full py-1 px-3 text-base"
         >
           {skill.skill_name}
-          <button
-            type="button"
-            onClick={() => onRemoveSkill(skill.skill_name)}
-            aria-label={`Remove ${skill.skill_name}`}
-            className="w-5 h-5 inline-flex items-center justify-center rounded-full text-[#E75A8F] hover:bg-[#E75A8F] hover:text-white transition-colors leading-none"
-          >
-            ×
-          </button>
         </span>
       ))}
     </div>
@@ -167,7 +189,7 @@ function SkillChips({ skills, onRemoveSkill }) {
 }
 
 // Show a short preview of skills; the full list opens in a pop-up so it doesn't flood the profile
-function SkillsList({ skills, onRemoveSkill }) {
+function SkillsList({ skills }) {
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
@@ -179,7 +201,7 @@ function SkillsList({ skills, onRemoveSkill }) {
 
   return (
     <>
-      <SkillChips skills={skills.slice(0, SKILL_PREVIEW_COUNT)} onRemoveSkill={onRemoveSkill} />
+      <SkillChips skills={skills.slice(0, SKILL_PREVIEW_COUNT)} />
       {skills.length > SKILL_PREVIEW_COUNT && (
         <button
           type="button"
@@ -213,7 +235,7 @@ function SkillsList({ skills, onRemoveSkill }) {
                 ×
               </button>
             </div>
-            <SkillChips skills={skills} onRemoveSkill={onRemoveSkill} />
+            <SkillChips skills={skills} />
           </div>
         </div>
       )}
@@ -221,13 +243,30 @@ function SkillsList({ skills, onRemoveSkill }) {
   );
 }
 
-function RightPanel({ userInfo, onRemoveSkill }) {
+// A section heading that opens the edit pop-up at that section; icon and text turn pink on hover
+function SectionTitle({ label, section, onEdit }) {
+  return (
+    <h3 className="m-0 my-[30px] text-2xl font-bold">
+      <button
+        type="button"
+        onClick={() => onEdit(section)}
+        title={`Edit ${label.replace(":", "").toLowerCase()}`}
+        className="inline-flex items-center gap-4 text-black hover:text-[#E75A8F] transition-colors cursor-pointer"
+      >
+        <EditIcon className="w-[22px] h-[22px] shrink-0" />
+        {label}
+      </button>
+    </h3>
+  );
+}
+
+function RightPanel({ userInfo, onEdit }) {
   if (userInfo) {
     return (
       <section className="relative flex flex-col justify-center p-[34px_34px_40px]">
         <h2 className="m-0 mb-7 text-center text-[26px] font-bold">Your current information:</h2>
         <div className="mx-auto max-w-[320px] w-full">
-          <MenuItem label="Education:" />
+          <SectionTitle label="Education:" section="education" onEdit={onEdit} />
           <ul>
             {userInfo.education.map((edu, i) => (
               <li key={i}>
@@ -236,7 +275,7 @@ function RightPanel({ userInfo, onRemoveSkill }) {
             ))}
           </ul>
 
-          <MenuItem label="Work Experience:" />
+          <SectionTitle label="Work Experience:" section="work" onEdit={onEdit} />
           <ul>
             {userInfo.employment_history.map((work, i) => (
               <li key={i}>
@@ -245,18 +284,18 @@ function RightPanel({ userInfo, onRemoveSkill }) {
             ))}
           </ul>
 
-          <MenuItem label="Projects:" />
+          <SectionTitle label="Projects:" section="projects" onEdit={onEdit} />
           <ul>
             {userInfo.projects.map((project, i) => (
               <li key={i}>{project}</li>
             ))}
           </ul>
 
-          <MenuItem label="Skills:" />
+          <SectionTitle label="Skills:" section="skills" onEdit={onEdit} />
           {/* Proficiency levels stay in the database for recommendations but aren't shown */}
-          <SkillsList skills={userInfo.skills} onRemoveSkill={onRemoveSkill} />
+          <SkillsList skills={userInfo.skills} />
 
-          <MenuItem label="Socials:" />
+          <SectionTitle label="Socials:" section="socials" onEdit={onEdit} />
           <ul>
             {userInfo.socials.map((social, i) => (
               <li key={i}>
@@ -275,11 +314,11 @@ function RightPanel({ userInfo, onRemoveSkill }) {
     <section className="relative flex flex-col justify-center p-[34px_34px_40px]">
       <h2 className="m-0 mb-7 text-center text-[26px] font-bold">Or, Manually Add Information:</h2>
       <div className="mx-auto max-w-[320px] w-full">
-        <MenuItem label="Education:" />
-        <MenuItem label="Work Experience:" />
-        <MenuItem label="Projects:" />
-        <MenuItem label="Skills:" />
-        <MenuItem label="Socials:" />
+        <SectionTitle label="Education:" section="education" onEdit={onEdit} />
+        <SectionTitle label="Work Experience:" section="work" onEdit={onEdit} />
+        <SectionTitle label="Projects:" section="projects" onEdit={onEdit} />
+        <SectionTitle label="Skills:" section="skills" onEdit={onEdit} />
+        <SectionTitle label="Socials:" section="socials" onEdit={onEdit} />
       </div>
     </section>
   );
@@ -307,6 +346,8 @@ export default function Profile() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadError, setUploadError] = useState("");
   const [userPersonal, setUserpersonal] = useState(null);
+  // Which section the edit pop-up opened at, or null when it's closed
+  const [editSection, setEditSection] = useState(null);
   const pollTimer = useRef(null);
   const {
     isAuthenticated,
@@ -401,27 +442,20 @@ export default function Profile() {
   };
 
 
-  const handleRemoveSkill = async (skillName) => {
-    // Remove immediately so the chip disappears on click; resync if the server rejects it
-    setUserInfo((prev) => ({
-      ...prev,
-      skills: prev.skills.filter((s) => s.skill_name !== skillName),
-    }));
-    try {
-      const token = await getAccessTokenSilently();
-      const res = await fetch("/api/profile/skills", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ skill_name: skillName }),
-      });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-    } catch (err) {
-      console.error("Failed to remove skill", err);
-      fetchProfile();
-    }
+  // Saves the whole edited profile; throws so the edit pop-up can show the error and stay open
+  const handleSaveProfile = async (profile) => {
+    const token = await getAccessTokenSilently();
+    const res = await fetch("/api/update_profile", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(profile),
+    });
+    if (!res.ok) throw new Error(`Status ${res.status}`);
+    const data = await res.json();
+    setUserInfo(data.user_info);
   };
 
   const processing = status === "processing";
@@ -441,9 +475,18 @@ export default function Profile() {
               setUploadError("");
             }}
             uploadError={uploadError}
+            onEditProfile={setEditSection}
           />
-          {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} onRemoveSkill={handleRemoveSkill} />}
+          {processing ? <ProcessingRightPanel /> : <RightPanel userInfo={userInfo} onEdit={setEditSection} />}
         </main>
+        {editSection && !processing && (
+          <EditProfileModal
+            profile={userInfo ?? EMPTY_PROFILE}
+            initialSection={editSection}
+            onSave={handleSaveProfile}
+            onClose={() => setEditSection(null)}
+          />
+        )}
       </div>
     </div>
   );

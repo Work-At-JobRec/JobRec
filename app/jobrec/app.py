@@ -19,8 +19,9 @@ from jobrec.openaiapi import (
     UserInfoTable,
     update_skill_db,
     UserInfo,
-    update_user_info,
+    clean_user_info,
 )
+from pydantic import ValidationError
 from jobrec.job_store import (
     JobListingTable,
     count_finalized_listings,
@@ -78,34 +79,34 @@ if env.get("DEV") is not None:
 @app.route("/api/update_profile", methods=["PUT"])
 @require_auth
 def update_profile():
-    data = request.get_json()
-    user_id = get_user_id()
+    """Replace the user's whole profile with the one they edited by hand.
 
-    name = data.get("name")
-    email = data.get("email")
-    phone = data.get("phone")
-    address = data.get("address")
-    # TODO: validation
-    skills = data.get("skills")
-    education = data.get("education")
-    projects = data.get("projects")
-    socials = data.get("socials")
-    employment_history = data.get("employment_history")
-    # TODO: probably needs some model_validates before this point
-    return jsonify(
-        update_user_info(
-            user_id,
-            name,
-            email,
-            phone,
-            address,
-            skills,
-            education,
-            projects,
-            socials,
-            employment_history,
+    The body is a complete profile in the same shape GET /api/profile returns.
+    """
+    try:
+        user_info = clean_user_info(
+            UserInfo.model_validate(request.get_json(silent=True) or {})
         )
-    )
+    except ValidationError as e:
+        return jsonify(error=e.errors(include_url=False, include_input=False)), 400
+
+    user_id = get_user_id()
+    with Session(engine) as session:
+        row = session.get(UserInfoTable, user_id)
+        if row is None:
+            session.add(
+                UserInfoTable(
+                    user_id=user_id, info=user_info.model_dump(), done_processing=True
+                )
+            )
+        elif not row.done_processing:
+            # A resume is still being parsed and would overwrite these edits
+            return jsonify(error="Your resume is still being parsed"), 409
+        else:
+            row.info = user_info.model_dump()
+        session.commit()
+
+    return jsonify(status="done", user_info=user_info.model_dump())
 
 
 # given a user and a listing, estimate the percentage of candidates the user exceeds in qualifications
