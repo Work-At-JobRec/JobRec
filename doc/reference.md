@@ -40,7 +40,7 @@ Technical reference for developers working on or with JobRec. It describes `main
 | | `skill_detection.py` | `canonical_skills` and `job_listing_skills` tables, OpenAI skill extraction |
 | | `listing_skill_extractor.py` | CLI that extracts skills for listings marked `skills_pending` |
 | Scraping | `scraper_base.py` | `BaseScraper` abstract class, `ScraperRequestError` |
-| | `greenhouse_scraper.py`, `lever_scraper.py`, `ashby_scraper.py`, `workday_scraper.py`, `llm_scraper.py` | One scraper per job-board type |
+| | `greenhouse_scraper.py`, `lever_scraper.py`, `ashby_scraper.py`, `workday_scraper.py`, `jobicy_scraper.py`, `llm_scraper.py` | One scraper per job-board type |
 | | `job_sources.py`, `job_sources.json`, `job_sources_demo.json` | Source registry model, the scraper-type map, and the two registries |
 | | `scraper_runner.py` | `fetch_all`: runs scrapers, isolating failures |
 | Pipeline and storage | `job_listing.py` | `JobListing` model shared by every scraper |
@@ -61,8 +61,9 @@ Technical reference for developers working on or with JobRec. It describes `main
 | `jobrec.service` | `app/deploy/jobrec.service` | `poetry run uwsgi --socket 127.0.0.1:3031 --wsgi-file jobrec/app.py --callable app --processes 4 --threads 2` |
 | `scrape-jobs.timer` / `.service` | `app/deploy/` | `python -m jobrec.scrape_all`, daily at 09:23 |
 | `extract-listing-skills.timer` / `.service` | `app/deploy/` | `python -m jobrec.listing_skill_extractor --limit 50`, daily at 10:23 |
+| `prune-jobs.timer` / `.service` | `app/deploy/` | `python -m jobrec.prune_jobs --delete`, Sundays at 13:23 |
 
-All services run as `ec2-user` from `/opt/jobrec/app`. `.github/workflows/deploy-to-aws.yml` copies the units on every push to `main` and enables `nginx.service` and `jobrec.service`.
+All services run as `ec2-user` from `/opt/jobrec/app`. `.github/workflows/deploy-to-aws.yml` copies the units on every push to `main` and enables `nginx.service`, `jobrec.service` and `prune-jobs.timer`.
 
 ---
 
@@ -214,12 +215,12 @@ Read from the process environment and from `app/.env` (via `python-dotenv`).
 
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `scraper` | string | yes | One of `ashby`, `greenhouse`, `lever`, `llm`, `workday` (anything else fails validation) |
+| `scraper` | string | yes | One of `ashby`, `greenhouse`, `jobicy`, `lever`, `llm`, `workday` (anything else fails validation) |
 | `id` | string | yes | The board identifier for that scraper (formats in [Job Sources and Scrapers](#job-sources-and-scrapers)) |
 | `company_name` | string | no | Display name; the scraper's own value is used when empty |
 | `enabled` | bool | no (default `true`) | `false` keeps the entry but skips it |
 
-`job_sources.json` (5 sources) is the default for `scrape_all`. `job_sources_demo.json` (22 sources) is used for demos, validation runs and pruning's Greenhouse board lookup.
+`job_sources.json` (6 sources: 5 companies and the all-industries `jobicy:all` board) is the default for `scrape_all`. `job_sources_demo.json` (22 sources) is used for demos, validation runs and pruning's Greenhouse board lookup.
 
 ### Scheduled jobs
 
@@ -227,8 +228,9 @@ Read from the process environment and from `app/.env` (via `python-dotenv`).
 | --- | --- | --- |
 | `scrape-jobs` | `python -m jobrec.scrape_all` | `*-*-* 09:23:00` (daily) |
 | `extract-listing-skills` | `python -m jobrec.listing_skill_extractor --limit 50` | `*-*-* 10:23:00` (daily) |
+| `prune-jobs` | `python -m jobrec.prune_jobs --delete` | `Sun *-*-* 13:23:00` (weekly) |
 
-Both timers set `Persistent=true`. The deploy workflow copies the timers but does not run `systemctl enable` for them.
+All three timers set `Persistent=true`. The deploy workflow copies all three but runs `systemctl enable --now` only for `prune-jobs.timer`.
 
 ---
 
@@ -306,9 +308,10 @@ Tables are created by SQLAlchemy (`Base.metadata.create_all` and `ensure_job_lis
 | `lever` | company slug (`palantir`) | `GET https://api.lever.co/v0/postings/{id}?mode=json` | none | never at scrape time (listed postings are open) |
 | `ashby` | organization slug (`ramp`) | `GET https://api.ashbyhq.com/posting-api/job-board/{id}?includeCompensation=true` | none | `isListed` is `false` |
 | `workday` | `host/site` (`nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite`) | `POST https://{host}/wday/cxs/{tenant}/{site}/jobs`, `{"limit": 20, "offset": N}` | 20 per page, at most 5 pages (100 postings) | `canApply` is `false` |
+| `jobicy` | industry filter, or `all` for every industry | `GET https://jobicy.com/api/v2/remote-jobs?count=100[&industry={id}][&cursor=...]` | 100 per page, at most 2 pages (200 jobs); stops at the first job posted more than 7 days ago | never at scrape time (listed jobs are open) |
 | `llm` | careers page URL | Page HTML read by an OpenAI model (`JOBREC_LLM_MODEL`) | at most 200 postings, 40,000 page characters | the page says the job is closed |
 
-`tenant` is the first label of the Workday host (`nvidia`). Every scraper also stores the source's job id as `source_job_id`.
+`tenant` is the first label of the Workday host (`nvidia`). `jobicy` is the only source not tied to one company: each job carries its own `companyName`, the location is stored as `Remote ({jobGeo})`, and `application_url` is the Jobicy job page, which Jobicy's terms ask applications to go through. Every scraper also stores the source's job id as `source_job_id`.
 
 ### Pipeline stages
 
@@ -324,6 +327,8 @@ Tables are created by SQLAlchemy (`Base.metadata.create_all` and `ensure_job_lis
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--sources PATH` | `jobrec/job_sources.json` | Registry to read |
+| `--max-per-source N` | none | Store at most N listings from each source |
+| `--max-listings N` | none | Store at most N listings in the whole run; later sources are skipped once it is reached |
 
 Output: one line per source (`new=`, `updated=`, `unchanged=`), then a total. Exit code `0` when every source ran and the database holds listings, otherwise `1`. It makes no OpenAI calls; new and changed listings are marked `skills_pending`.
 
