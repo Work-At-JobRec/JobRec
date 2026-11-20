@@ -12,8 +12,10 @@ from jobrec.job_store import count_listings, list_listings
 from jobrec.llm_scraper import (
     ExtractedListing,
     LlmPageScraper,
+    ModelCallBudget,
     PageCache,
     PostingLinks,
+    main_content_text,
     page_text_and_links,
     structured_source_for,
 )
@@ -24,6 +26,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 CAREERS = "https://acme-robotics.example/careers"
 POSTING_A = "https://acme-robotics.example/careers/backend-engineer"
 POSTING_B = "https://acme-robotics.example/careers/product-designer"
+SITEMAP = "https://acme-robotics.example/sitemap.xml"
 
 
 def fixture(name: str) -> str:
@@ -82,8 +85,16 @@ class FakeClient:
         return [c for c in self.calls if c["text_format"] is ExtractedListing]
 
 
+NOT_FOUND = FakeResponse("Not found", status=404)
+
+
 def routes(**overrides):
-    base = {CAREERS: fixture("llm_careers.html"), POSTING_A: fixture("llm_posting_a.html"), POSTING_B: fixture("llm_posting_b.html")}
+    base = {
+        CAREERS: fixture("llm_careers.html"),
+        POSTING_A: fixture("llm_posting_a.html"),
+        POSTING_B: fixture("llm_posting_b.html"),
+        SITEMAP: NOT_FOUND,
+    }
     base.update(overrides)
     return base
 
@@ -98,9 +109,17 @@ EXTRACT_A = ExtractedListing(
 EXTRACT_B = ExtractedListing(title="Product Designer", location="Chicago, IL", description="You will design the operator console", pay=None, status="closed")
 
 
-def make_scraper(session=None, client=None, cache=None, links=(POSTING_A, POSTING_B), extractions=None):
+def make_scraper(session=None, client=None, cache=None, links=(POSTING_A, POSTING_B), extractions=None, budget=None):
     client = client or FakeClient(links, extractions or [("Backend Engineer", EXTRACT_A), ("Product Designer", EXTRACT_B)])
-    return LlmPageScraper(CAREERS, company_name="Acme Robotics", session=session or FakeSession(routes()), client=client, cache=cache), client
+    scraper = LlmPageScraper(
+        CAREERS,
+        company_name="Acme Robotics",
+        session=session or FakeSession(routes()),
+        client=client,
+        cache=cache,
+        budget=budget or ModelCallBudget(1000),
+    )
+    return scraper, client
 
 
 # --- parsing the page ---
@@ -283,11 +302,164 @@ def test_cache_round_trips_through_a_json_file(tmp_path):
 # A careers page rendered only by JavaScript has no links to follow: nothing is returned and it is logged as unsupported
 def test_js_only_page_is_unsupported(caplog):
     caplog.set_level(logging.WARNING)
-    scraper, client = make_scraper(session=FakeSession({CAREERS: fixture("llm_careers_js_only.html")}))
+    scraper, client = make_scraper(session=FakeSession({CAREERS: fixture("llm_careers_js_only.html"), SITEMAP: NOT_FOUND}))
 
     assert scraper.fetch_jobs() == []
     assert client.calls == []
     assert "unsupported" in caplog.text.lower() and CAREERS in caplog.text
+
+
+# --- main content (#146) ---
+
+NAV_POSTING = "https://acme-robotics.example/careers/field-technician"
+
+
+# The main content skips the site header, menu and footer
+def test_main_content_text_skips_navigation_header_and_footer():
+    text = main_content_text(fixture("llm_posting_nav.html"), NAV_POSTING)
+
+    assert text.startswith("Field Technician")
+    assert "Keep our customers' robot fleets running" in text
+    for chrome in ("Products and Solutions", "Contact Sales", "Privacy Policy", "All rights reserved"):
+        assert chrome not in text
+
+
+# Without <main>, the longest <article> is the content
+def test_main_content_text_uses_the_article_when_there_is_no_main():
+    text = main_content_text(fixture("llm_posting_a.html"), POSTING_A)
+
+    assert text.startswith("Backend Engineer")
+    assert text.endswith("Apply for this job")
+    assert "Home" not in text
+
+
+# Without <main> or <article>, the page minus nav, header, footer and aside is used
+def test_main_content_text_drops_chrome_when_there_is_no_content_region():
+    html = "<body><nav>Menu Pricing</nav><div><h1>Driver</h1><p>Deliver parts.</p></div><footer>Legal</footer></body>"
+
+    assert main_content_text(html, CAREERS) == "Driver\n\nDeliver parts."
+
+
+# A rewritten description falls back to the posting's main content, not to the whole page with its menus
+def test_description_fallback_is_the_main_content_without_menu_text():
+    session = FakeSession(routes(**{POSTING_A: fixture("llm_posting_nav.html")}))
+    rewritten = ExtractedListing(title="Field Technician", description="A summary the model wrote itself")
+    scraper, _ = make_scraper(session=session, links=[POSTING_A], extractions=[("Field Technician", rewritten)])
+
+    [listing] = scraper.fetch_jobs()
+
+    assert listing.description.startswith("Field Technician")
+    assert "Diagnose and repair drive and sensor faults" in listing.description
+    for chrome in ("Products and Solutions", "Contact Sales", "Privacy Policy"):
+        assert chrome not in listing.description
+
+
+# --- JavaScript-rendered careers pages (#147) ---
+
+
+# Postings embedded as schema.org JobPosting data are read directly, without the model
+def test_js_page_with_structured_data_gives_listings_without_model_calls():
+    session = FakeSession({CAREERS: fixture("llm_careers_json_ld.html")})
+    scraper, client = make_scraper(session=session)
+
+    listings = scraper.fetch_jobs()
+
+    assert client.calls == []
+    assert session.calls == [CAREERS]
+    lead, success = listings
+    assert lead.title == "Warehouse Operations Lead"
+    assert lead.application_url == "https://acme-robotics.example/careers/jobs/417"
+    assert lead.company_name == "Acme Robotics"
+    assert lead.location == "Reno, NV, US"
+    assert lead.pay == "USD 62,000-70,000 (year)"
+    assert lead.source_job_id == "417"
+    assert lead.posted_at.isoformat() == "2026-11-10T00:00:00+00:00"
+    assert "night shift" in lead.description
+    assert lead.status == "open"
+    assert success.location == "Remote"
+    assert success.application_url == "https://acme-robotics.example/careers/jobs/418"
+
+
+# A posting whose validThrough date has passed is stored as closed
+def test_structured_data_posting_past_valid_through_is_closed():
+    page = fixture("llm_careers_json_ld.html").replace(
+        '"datePosted": "2026-11-10",', '"datePosted": "2026-11-10", "validThrough": "2020-01-01",'
+    )
+    scraper, _ = make_scraper(session=FakeSession({CAREERS: page}))
+
+    lead, _ = scraper.fetch_jobs()
+
+    assert lead.status == "closed"
+
+
+# With no links and no structured data, posting URLs from the site's sitemap are offered to the model
+def test_js_page_falls_back_to_sitemap_postings():
+    sitemap = (
+        '<?xml version="1.0"?><urlset>'
+        "<url><loc>https://acme-robotics.example/</loc></url>"
+        "<url><loc>https://acme-robotics.example/about</loc></url>"
+        f"<url><loc>{CAREERS}</loc></url>"
+        f"<url><loc>{POSTING_A}</loc></url>"
+        "<url><loc>https://other-site.example/careers/x</loc></url>"
+        "</urlset>"
+    )
+    session = FakeSession(routes(**{CAREERS: fixture("llm_careers_js_only.html"), SITEMAP: sitemap}))
+    scraper, client = make_scraper(session=session, links=[POSTING_A])
+
+    listings = scraper.fetch_jobs()
+
+    assert [listing.application_url for listing in listings] == [POSTING_A]
+    link_prompt = client.calls[0]["input"][0]["content"][0]["text"]
+    assert POSTING_A in link_prompt
+    assert "https://acme-robotics.example/about" not in link_prompt and "other-site" not in link_prompt
+
+
+# --- model call cap (#147) ---
+
+
+# When the run's budget is spent, the scraper keeps what it read and logs how many postings it skipped
+def test_model_call_cap_stops_the_run_and_logs_skipped_postings(caplog):
+    caplog.set_level(logging.INFO)
+    budget = ModelCallBudget(2)  # one call for the links, one for the first posting
+    scraper, client = make_scraper(budget=budget)
+
+    listings = scraper.fetch_jobs()
+
+    assert [listing.application_url for listing in listings] == [POSTING_A]
+    assert len(client.calls) == 2 and budget.used == 2
+    assert "1 posting(s)" in caplog.text and "cap of 2" in caplog.text
+
+
+# The budget is shared, so a second source in the same run is not read once it is spent
+def test_model_call_cap_is_shared_across_scrapers(caplog):
+    caplog.set_level(logging.WARNING)
+    budget = ModelCallBudget(3)
+    first, _ = make_scraper(budget=budget)
+    second, second_client = make_scraper(budget=budget)
+
+    assert len(first.fetch_jobs()) == 2
+    assert second.fetch_jobs() == []
+    assert second_client.calls == []
+    assert "was not read" in caplog.text
+
+
+# Pages served from the cache do not use the budget
+def test_cached_pages_do_not_use_the_budget():
+    cache = PageCache()
+    make_scraper(cache=cache)[0].fetch_jobs()
+    budget = ModelCallBudget(0)
+    scraper, client = make_scraper(cache=cache, budget=budget)
+
+    assert len(scraper.fetch_jobs()) == 2
+    assert client.calls == [] and budget.used == 0
+
+
+# JOBREC_LLM_MAX_CALLS sets the cap; a bad value falls back to the default
+def test_budget_reads_the_cap_from_the_environment(monkeypatch):
+    monkeypatch.setenv("JOBREC_LLM_MAX_CALLS", "25")
+    assert ModelCallBudget.from_env().limit == 25
+    monkeypatch.setenv("JOBREC_LLM_MAX_CALLS", "lots")
+    assert ModelCallBudget.from_env().limit == 300
 
 
 # A posting page that cannot be fetched is skipped; the others are still returned

@@ -198,6 +198,7 @@ Read from the process environment and from `app/.env` (via `python-dotenv`).
 | `APP_BASE_URL` | `app.py` (only when run as `python -m jobrec.app`) | for local runs | none | `http://localhost:5001`; port defaults to 5001 |
 | `DEV` | `app.py` | no | unset | When set, every `user_info` row is deleted at startup |
 | `JOBREC_LLM_MODEL` | `llm_scraper.py` | no | `gpt-5.2` | Model for the LLM fallback scraper |
+| `JOBREC_LLM_MAX_CALLS` | `llm_scraper.py` | no | `300` | Model calls allowed in one scrape run across every `llm` source; cached pages do not count. A careers page that renders with JavaScript is read from its schema.org `JobPosting` data, then its `sitemap.xml`, before the model is used |
 | `TEST_DATABASE_URL` | `app/test/conftest.py` | no | unset (tests use SQLite) | Postgres URL whose database name contains `test` |
 | `DEPLOYMENT` | systemd units | no | `True` on the host | Set by every unit; not read by backend code on `main` |
 | `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE` | `frontend/src/main.jsx` | yes (frontend build) | none | Auth0 SPA settings, baked in at `vite build` |
