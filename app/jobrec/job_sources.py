@@ -2,7 +2,8 @@
 
 The registry is the checked-in ``job_sources.json`` next to this module: a list
 of entries naming which scraper handles a source and the source's identifier
-(a Greenhouse board token, a Lever company slug, ...). Adding a company means
+(a Greenhouse board token, a Lever company slug, ...). A ``jobicy`` entry is
+not tied to a company: it reads recent jobs from every employer on that board. Adding a company means
 adding a line to that file, not changing code. ``scrape_all`` runs the full
 pipeline (fetch, normalize, validate, store) once per enabled source, so one
 failing source never affects the others.
@@ -18,6 +19,7 @@ from sqlalchemy import Engine
 
 from jobrec.ashby_scraper import AshbyScraper
 from jobrec.greenhouse_scraper import GreenhouseScraper
+from jobrec.jobicy_scraper import JobicyScraper
 from jobrec.job_store import UpsertResult
 from jobrec.lever_scraper import LeverScraper
 from jobrec.llm_scraper import LlmPageScraper, structured_source_for
@@ -33,6 +35,7 @@ DEFAULT_SOURCES_PATH = Path(__file__).with_name("job_sources.json")
 SCRAPER_TYPES: dict[str, type] = {
     "ashby": AshbyScraper,
     "greenhouse": GreenhouseScraper,
+    "jobicy": JobicyScraper,
     "lever": LeverScraper,
     "llm": LlmPageScraper,
     "workday": WorkdayScraper,

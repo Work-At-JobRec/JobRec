@@ -4,6 +4,7 @@
     {"scraper": "greenhouse", "id": "figma", "company_name": "Figma", "enabled": true},
     {"scraper": "greenhouse", "id": "cloudflare", "company_name": "Cloudflare", "enabled": true},
     {"scraper": "lever", "id": "palantir", "company_name": "Palantir", "enabled": true},
-    {"scraper": "workday", "id": "nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "company_name": "NVIDIA", "enabled": true}
+    {"scraper": "workday", "id": "nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "company_name": "NVIDIA", "enabled": true},
+    {"scraper": "jobicy", "id": "all", "company_name": "Jobicy (all industries)", "enabled": true}
   ]
 }

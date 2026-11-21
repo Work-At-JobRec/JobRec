@@ -21,6 +21,7 @@ from jobrec.job_sources import (
     scrape_all,
 )  # noqa: E402
 from jobrec.job_store import count_listings, list_listings  # noqa: E402
+from jobrec.jobicy_scraper import JobicyScraper  # noqa: E402
 from jobrec.lever_scraper import LeverScraper  # noqa: E402
 from jobrec.scraper_base import BaseScraper, ScraperRequestError  # noqa: E402
 from jobrec.workday_scraper import WorkdayScraper  # noqa: E402
@@ -137,6 +138,14 @@ def test_build_scraper_constructs_the_right_type():
     assert lever.company == "beta" and lever.company_name is None
     assert isinstance(workday, WorkdayScraper)
     assert workday.site == "AcmeCareers" and workday.company_name == "Acme"
+
+
+# A jobicy entry is not tied to a company: its id is the industry filter, "all" for none
+def test_build_scraper_constructs_a_jobicy_scraper():
+    jobicy = build_scraper(JobSource(scraper="jobicy", id="all"))
+
+    assert isinstance(jobicy, JobicyScraper)
+    assert jobicy.industry == "all"
 
 
 # --- scraping every source ---
