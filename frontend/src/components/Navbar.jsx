@@ -1,8 +1,19 @@
-import { Link, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 
-const navLinkClass =
-  "text-[28px] font-bold justify-self-center text-white no-underline hover:text-[#E75A8F] transition-colors";
+const ACTIVE = "text-[#E75A8F]";
+const navLinkBase =
+  "text-[28px] font-bold justify-self-center no-underline hover:text-[#E75A8F] transition-colors";
+
+// NavLink passes isActive: the link for the page you're on turns fuchsia, the rest stay white.
+// Buttons (Log In / Log Out) call it with no arguments and stay white.
+const navLinkClass = ({ isActive } = {}) =>
+  `${navLinkBase} ${isActive ? ACTIVE : "text-white"}`;
+
+const logoClass = ({ isActive }) =>
+  `text-[30px] font-bold justify-self-start no-underline hover:text-[#E75A8F] transition-colors ${
+    isActive ? ACTIVE : "text-white"
+  }`;
 
 export default function Navbar() {
   const {
@@ -28,12 +39,10 @@ export default function Navbar() {
           : "grid-cols-[1.5fr_1fr_1fr_1fr]"
       } items-center py-2.5 px-[18px] min-h-[58px] w-full`}
     >
-      <Link
-        to="/"
-        className="text-[30px] font-bold justify-self-start no-underline text-white hover:text-[#E75A8F] transition-colors"
-      >
+      {/* `end` so the logo is only active on the home page itself, not on every page */}
+      <NavLink to="/" end className={logoClass}>
         JobRec
-      </Link>
+      </NavLink>
 
       <NavLink to="/jobs" className={navLinkClass}>
         Jobs
@@ -53,7 +62,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={handleLogout}
-              className={`${navLinkClass} cursor-pointer`}
+              className={`${navLinkClass()} cursor-pointer`}
             >
               Log Out
             </button>
@@ -62,7 +71,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() => loginWithRedirect()}
-            className={`${navLinkClass} cursor-pointer`}
+            className={`${navLinkClass()} cursor-pointer`}
           >
             Log In
           </button>
